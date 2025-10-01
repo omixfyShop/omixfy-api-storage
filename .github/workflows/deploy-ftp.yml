@@ -1,0 +1,104 @@
+name: Deploy (FTPS) to Hostinger
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build Laravel + React
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, bcmath, pdo_mysql, zip
+          coverage: none
+
+      - name: Install PHP dependencies (Composer)
+        run: composer install --no-dev --prefer-dist --optimize-autoloader
+
+      - name: Prepare .env for build key (not deployed)
+        run: |
+          if [ ! -f .env ]; then cp .env.example .env; fi
+          php artisan key:generate
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install & Build (Vite)
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare deploy folder
+        run: |
+          set -e
+          rm -rf deploy
+          mkdir -p deploy/assetsme
+          rsync -a \
+            --delete \
+            --exclude=".git" \
+            --exclude=".github" \
+            --exclude="node_modules" \
+            --exclude="tests" \
+            --exclude="deploy" \
+            --exclude=".env" \
+            --exclude="storage/logs/*" \
+            --exclude="storage/framework/sessions/*" \
+            --exclude="storage/framework/cache/*" \
+            --exclude="storage/framework/views/*" \
+            --exclude=".ftp-deploy-sync-state.json" \
+            ./ deploy/assetsme/
+
+          cat > deploy/index.php <<'PHP'
+<?php require __DIR__ . '/assetsme/public/index.php';
+PHP
+
+          mkdir -p deploy/assetsme/public/assets
+          if [ -f public/assets/.htaccess ]; then
+            cp public/assets/.htaccess deploy/assetsme/public/assets/.htaccess
+          else
+            cat > deploy/assetsme/public/assets/.htaccess <<'HTACCESS'
+Options -Indexes
+<FilesMatch "\.(php|phar|phtml)$">
+  Deny from all
+</FilesMatch>
+<IfModule mod_headers.c>
+  <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|css|js|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+    Header set Access-Control-Allow-Origin "*"
+  </FilesMatch>
+</IfModule>
+HTACCESS
+          fi
+
+      - name: Upload via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          protocol: ftps
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}/
+          local-dir: deploy/
+          state-name: .ftp-deploy-sync-state.json
+          exclude: |
+            **/.git*
+            **/.github/**
+            **/node_modules/**
+            **/.env
+            **/storage/logs/**
+            **/storage/framework/cache/**
+            **/storage/framework/sessions/**
+            **/storage/framework/views/**
+            **/.ftp-deploy-sync-state.json

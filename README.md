@@ -125,6 +125,30 @@ As chamadas ao backend são feitas via `fetch` utilizando `Authorization: Bearer
 - Ajuste `APP_URL`, `ASSETS_BASE_URL` e tokens nas variáveis de ambiente do servidor.
 - Para ambientes compartilhados (Apache), mantenha as regras de cache e bloqueio de execução PHP para evitar upload de scripts maliciosos.
 
+## Deploy via FTPS (GitHub Actions)
+
+O repositório possui um workflow (`.github/workflows/deploy-ftp.yml`) que constrói a aplicação (Composer + Vite) e publica os artefatos via FTPS utilizando a ação `SamKirkland/FTP-Deploy-Action`. O deploy é incremental e preserva o `.env` remoto.
+
+### Secrets necessários
+
+Configure em **Actions → Secrets and variables → Actions**:
+
+- `FTP_SERVER`: endereço do servidor (ex.: `ftp.seudominio.com`).
+- `FTP_USERNAME`: usuário com permissão de escrita no `public_html`.
+- `FTP_PASSWORD`: senha do usuário FTP.
+- `FTP_SERVER_DIR`: diretório remoto de destino (ex.: `/public_html`).
+- `FTP_PORT` (opcional): porta FTPS, padrão `21`.
+
+### Checklist da primeira publicação
+
+- [ ] Criar manualmente `public_html/assetsme/.env` no servidor com `APP_KEY` e demais configurações reais.
+- [ ] Garantir permissões de escrita para o processo web em `public_html/assetsme/storage/` e `public_html/assetsme/bootstrap/cache/`.
+- [ ] Confirmar que existe um `index.php` de ponte em `public_html/` apontando para `assetsme/public/index.php` (gerado pelo workflow).
+- [ ] Fazer `git push origin main` para disparar o workflow de deploy.
+- [ ] Executar migrações manualmente via SSH ou hPanel sempre que necessário (FTPS não executa comandos).
+
+O workflow compila as dependências PHP (sem `--dev`), gera os assets com Vite, envia o conteúdo preparado em `deploy/` para `${FTP_SERVER_DIR}` e nunca sincroniza o `.env` local, mantendo o arquivo remoto intacto.
+
 ## Comandos úteis
 
 ```bash
