@@ -1,18 +1,37 @@
-name: Deploy (FTPS) to Hostinger
+name: Deploy (ZIP over FTPS) to Hostinger
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  build:
-    name: Build and Deploy
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # -------- caches para acelerar --------
+      - name: Get Composer cache dir
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      # -------- build --------
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -23,7 +42,7 @@ jobs:
       - name: Install PHP dependencies (Composer)
         run: composer install --no-dev --prefer-dist --optimize-autoloader
 
-      # Apenas para gerar APP_KEY durante o build (NÃO envia .env)
+      # Gera APP_KEY só para compilar (não envia .env)
       - name: Prepare .env for build key (not deployed)
         run: |
           if [ ! -f .env ]; then cp .env.example .env; fi
@@ -39,75 +58,143 @@ jobs:
           npm ci
           npm run build
 
-      - name: Prepare deploy folder
+      # -------- empacota como ZIP --------
+      - name: Prepare ZIP artifact
         run: |
           set -e
-          rm -rf deploy
-          mkdir -p deploy
+          REL=$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}
+          echo "REL=$REL" >> $GITHUB_ENV
 
-          # Copia TODO o projeto para deploy/ (sem .env, node_modules, .github etc.)
+          rm -rf release upload
+          mkdir -p release upload/releases
+
           rsync -a \
             --delete \
             --exclude=".git" \
             --exclude=".github" \
             --exclude="node_modules" \
             --exclude="tests" \
-            --exclude="deploy" \
+            --exclude="release" \
+            --exclude="upload" \
             --exclude=".env" \
             --exclude="storage/logs/*" \
             --exclude="storage/framework/sessions/*" \
             --exclude="storage/framework/cache/*" \
             --exclude="storage/framework/views/*" \
-            --exclude=".ftp-deploy-sync-state.json" \
-            ./ deploy/
+            . ./release/
 
-          # index.php ponte na RAIZ do docroot -> public/index.php (sem /assetsme)
-          printf "%s\n" "<?php require __DIR__ . '/public/index.php';" > deploy/index.php
+          # .htaccess forte para assets
+          mkdir -p release/public/assets
+          cat > release/public/assets/.htaccess <<'HTA'
+Options -Indexes
+<FilesMatch "\.(php|phar|phtml)$">
+  Deny from all
+</FilesMatch>
+<IfModule mod_headers.c>
+  <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|css|js|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+    Header set Access-Control-Allow-Origin "*"
+  </FilesMatch>
+</IfModule>
+HTA
 
-          # .htaccess forte em public/assets (sempre cria)
-          mkdir -p deploy/public/assets
-          printf "%s\n" \
-            "Options -Indexes" \
-            "<FilesMatch \"\\.(php|phar|phtml)$\">" \
-            "  Deny from all" \
-            "</FilesMatch>" \
-            "<IfModule mod_headers.c>" \
-            "  <FilesMatch \"\\.(jpg|jpeg|png|gif|webp|svg|css|js|woff2?)$\">" \
-            "    Header set Cache-Control \"public, max-age=31536000, immutable\"" \
-            "    Header set Access-Control-Allow-Origin \"*\"" \
-            "  </FilesMatch>" \
-            "</IfModule>" \
-            > deploy/public/assets/.htaccess
+          # Gera o ZIP
+          cd release
+          zip -r ../upload/releases/${REL}.zip . -q
+          cd ..
 
-          # Sentinela para conferência
-          date -u > deploy/_deploy-check.txt
+          # deployer.php + proteção + token (ficam no docroot)
+          cat > upload/deployer.php <<'PHP'
+<?php
+declare(strict_types=1);
+/** Simple ZIP deployer with token */
+$docroot = __DIR__;
+$releasesDir = $docroot . '/releases';
+$logsDir = $docroot . '/deploy-logs';
+$tokenFile = $docroot . '/.deploy_token';
+$currentFile = $docroot . '/current';
+@ini_set('max_execution_time','300');
+@ini_set('memory_limit','512M');
+function fail($c,$m){http_response_code($c);header('Content-Type: application/json');echo json_encode(['ok'=>false,'error'=>$m]);exit;}
+$token = $_GET['token'] ?? ''; $name = $_GET['name'] ?? '';
+if ($token==='') fail(401,'missing token');
+if (!is_file($tokenFile)) fail(500,'token file missing');
+if (!hash_equals(trim(file_get_contents($tokenFile)), $token)) fail(401,'invalid token');
+if (!preg_match('/^[0-9]{14}-[a-f0-9]{7}$/',$name)) fail(400,'invalid name format');
+@mkdir($releasesDir,0755,true); @mkdir($logsDir,0755,true);
+$zipPath = "$releasesDir/$name.zip"; $target = "$releasesDir/$name";
+$log = $logsDir.'/deploy-'.date('Ymd-His').'.log';
+file_put_contents($log,"[".date('c')."] name=$name\n",FILE_APPEND);
+$zip = new ZipArchive(); if ($zip->open($zipPath)!==true) fail(404,'zip not found');
+@mkdir($target,0755,true); if(!$zip->extractTo($target)) fail(500,'extract error'); $zip->close();
+file_put_contents($currentFile,$name);
+$index = <<<'PHPIDX'
+<?php
+$rel=@file_get_contents(__DIR__.'/current'); $rel=$rel?trim($rel):'';
+if($rel===''||!is_dir(__DIR__."/releases/$rel/public")){http_response_code(503);echo "Deploy incomplete.";exit;}
+require __DIR__."/releases/$rel/public/index.php";
+PHPIDX;
+file_put_contents($docroot.'/index.php',$index);
+@unlink($zipPath);
+$dirs=array_filter(glob($releasesDir.'/*'),'is_dir'); usort($dirs,fn($a,$b)=>filemtime($b)<=>filemtime($a));
+foreach(array_slice($dirs,5) as $d){$it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($d,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST); foreach($it as $f){$f->isDir()?@rmdir($f->getPathname()):@unlink($f->getPathname());} @rmdir($d);}
+header('Content-Type: application/json'); echo json_encode(['ok'=>true,'release'=>$name]);
+PHP
 
-      - name: Debug - list deploy content
+          cat > upload/.htaccess <<'HTDOC'
+Options -Indexes
+<Files ".deploy_token">
+  Require all denied
+</Files>
+HTDOC
+
+          echo "${{ secrets.DEPLOY_HOOK_TOKEN }}" > upload/.deploy_token
+
+      - name: Debug - local files
         run: |
-          echo "---- TREE deploy/ (até 3 níveis) ----"
-          find deploy -maxdepth 3 -type f | sed 's/^/  /'
-          echo "--------------------------------------"
+          echo "ZIP gerado:"
+          ls -lh upload/releases/*.zip
+          echo "Deployer e token:"
+          ls -la upload | sed 's/^/  /'
 
-      - name: Deploy via FTPS
+      # -------- upload via FTPS --------
+      - name: Upload deployer & token (docroot)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
-          # >>> aponte para o Document Root exato do cdn.omixfy.com (ex.: /public_html ou /public_html/cdn)
           server-dir: ${{ secrets.FTP_SERVER_DIR }}/
-          local-dir: deploy/
-          state-name: .ftp-deploy-sync-state.json
-          # Força um full sync no primeiro push para evitar "só pastas"
-          dangerous-clean-slate: true
+          local-dir: upload/
+          exclude: |
+            **/releases/**
+            **/.git*
+            **/.github/**
+            **/node_modules/**
+            **/.env
+
+      - name: Upload ZIP to /releases
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}/releases/
+          local-dir: upload/releases/
+          dangerous-clean-slate: false
           exclude: |
             **/.git*
             **/.github/**
             **/node_modules/**
             **/.env
-            **/storage/logs/**
-            **/storage/framework/cache/**
-            **/storage/framework/sessions/**
-            **/storage/framework/views/**
-            **/.ftp-deploy-sync-state.json
+
+      # -------- dispara descompactação --------
+      - name: Trigger remote deploy (unzip & activate)
+        env: { REL: ${{ env.REL }} }
+        run: |
+          set -e
+          URL="${{ secrets.SITE_BASE_URL }}/deployer.php?token=${{ secrets.DEPLOY_HOOK_TOKEN }}&name=${REL}"
+          echo "Calling: $URL"
+          curl -fsS "$URL"
