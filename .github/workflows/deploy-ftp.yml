@@ -78,7 +78,7 @@ jobs:
             > deploy/assetsme/public/assets/.htaccess
 
       - name: Deploy via FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
