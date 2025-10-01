@@ -1,62 +1,71 @@
 name: Deploy (ZIP over FTPS) to Hostinger
-'on':
+
+on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: 'mbstring, intl, bcmath, pdo_mysql, zip'
+          extensions: mbstring, intl, bcmath, pdo_mysql, zip
           coverage: none
+
+      # Caches
       - name: Get Composer cache dir
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
       - name: Cache Composer
         uses: actions/cache@v4
         with:
-          path: '${{ steps.composer-cache.outputs.dir }}'
-          key: '${{ runner.os }}-composer-${{ hashFiles(''**/composer.lock'') }}'
-          restore-keys: '${{ runner.os }}-composer-'
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: '${{ runner.os }}-npm-${{ hashFiles(''**/package-lock.json'') }}'
-          restore-keys: '${{ runner.os }}-npm-'
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      # Build
       - name: Install PHP dependencies (Composer)
         run: composer install --no-dev --prefer-dist --optimize-autoloader
+
       - name: Prepare .env for build key (not deployed)
         run: |
           if [ ! -f .env ]; then cp .env.example .env; fi
           php artisan key:generate
+
       - name: Install & Build (Vite)
         run: |
           npm ci
           npm run build
+
+      # Empacota ZIP e prepara artefatos do docroot (dinâmico)
       - name: Prepare ZIP artifact
-        run: >
+        run: |
           set -e
-
           REL="$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
-
           echo "REL=$REL" >> $GITHUB_ENV
 
-
           rm -rf release upload
-
           mkdir -p release upload/releases
-
 
           rsync -a \
             --delete \
@@ -73,10 +82,8 @@ jobs:
             --exclude="storage/framework/views/*" \
             . ./release/
 
-          # .htaccess para assets (printf)
-
+          # .htaccess para cache de /public/assets no release
           mkdir -p release/public/assets
-
           printf '%s\n' \
             'Options -Indexes' \
             '<FilesMatch "\.(php|phar|phtml)$">' \
@@ -91,145 +98,113 @@ jobs:
             > release/public/assets/.htaccess
 
           # Cria o ZIP do release
-
           cd release
-
           zip -r ../upload/releases/${REL}.zip . -q
-
           cd ..
 
+          # ====== DOCROOT FILES (upload/) ======
 
-          # deployer.php (printf linha a linha, sem heredoc)
+          # index.php "ponte": usa symlink /current quando existir; senão lê current.release
+          : > upload/index.php
+          printf '%s\n' '<?php' >> upload/index.php
+          printf '%s\n' 'error_reporting(E_ALL & ~E_NOTICE);' >> upload/index.php
+          printf '%s\n' '$base=__DIR__;' >> upload/index.php
+          printf '%s\n' 'if (is_link($base."/current") || is_dir($base."/current")) {' >> upload/index.php
+          printf '%s\n' '  $target=$base."/current/public/index.php";' >> upload/index.php
+          printf '%s\n' '  if (is_file($target)) { require $target; exit; }' >> upload/index.php
+          printf '%s\n' '}' >> upload/index.php
+          printf '%s\n' '$rel=@file_get_contents($base."/current.release"); $rel=$rel?trim($rel):"";' >> upload/index.php
+          printf '%s\n' 'if ($rel!=="" && is_dir($base."/releases/".$rel."/public")) {' >> upload/index.php
+          printf '%s\n' '  require $base."/releases/".$rel."/public/index.php"; exit;' >> upload/index.php
+          printf '%s\n' '}' >> upload/index.php
+          printf '%s\n' 'http_response_code(503); echo "Deploy incomplete."; exit;' >> upload/index.php
 
-          mkdir -p upload
+          # .htaccess do DOCROOT (genérico): sempre tenta servir /current/public/*
+          : > upload/.htaccess
+          printf '%s\n' 'Options -Indexes' >> upload/.htaccess
+          printf '%s\n' '<IfModule mod_rewrite.c>' >> upload/.htaccess
+          printf '%s\n' '  RewriteEngine On' >> upload/.htaccess
+          printf '%s\n' '  # permite chamar o deployer' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^deployer\.php$ - [L]' >> upload/.htaccess
+          printf '%s\n' '  # protege token' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^\.deploy_token - [F,L]' >> upload/.htaccess
+          printf '%s\n' '  # estáticos via symlink "current" (se existir)' >> upload/.htaccess
+          printf '%s\n' '  RewriteCond %{DOCUMENT_ROOT}/current/public%{REQUEST_URI} -f' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^(.*)$ /current/public/\$1 [L]' >> upload/.htaccess
+          printf '%s\n' '  # se arquivo/pasta real no docroot, serve' >> upload/.htaccess
+          printf '%s\n' '  RewriteCond %{REQUEST_FILENAME} -f [OR]' >> upload/.htaccess
+          printf '%s\n' '  RewriteCond %{REQUEST_FILENAME} -d' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^ - [L]' >> upload/.htaccess
+          printf '%s\n' '  # fallback para front controller' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^ index.php [L]' >> upload/.htaccess
+          printf '%s\n' '</IfModule>' >> upload/.htaccess
 
-          : > upload/deployer.php
-
-          printf '%s\n' '<?php' >> upload/deployer.php
-
-          printf '%s\n' 'declare(strict_types=1);' >> upload/deployer.php
-
-          printf '%s\n' '$docroot=__DIR__;' >> upload/deployer.php
-
-          printf '%s\n' '$releases=$docroot."/releases";' >> upload/deployer.php
-
-          printf '%s\n' '$logs=$docroot."/deploy-logs";' >> upload/deployer.php
-
-          printf '%s\n' '$tokenFile=$docroot."/.deploy_token";' >>
-          upload/deployer.php
-
-          printf '%s\n' '@ini_set("max_execution_time","300");' >>
-          upload/deployer.php
-
-          printf '%s\n' '@ini_set("memory_limit","512M");' >>
-          upload/deployer.php
-
-          printf '%s\n' 'function
-          fail($c,$m){http_response_code($c);header("Content-Type:
-          application/json");echo json_encode(["ok"=>false,"error"=>$m]);exit;}'
-          >> upload/deployer.php
-
-          printf '%s\n' '$token=$_GET["token"] ?? ""; $name=$_GET["name"] ??
-          "";' >> upload/deployer.php
-
-          printf '%s\n' 'if($token==="") fail(401,"missing token");' >>
-          upload/deployer.php
-
-          printf '%s\n' 'if(!is_file($tokenFile)) fail(500,"token file
-          missing");' >> upload/deployer.php
-
-          printf '%s\n'
-          'if(!hash_equals(trim((string)file_get_contents($tokenFile)),$token))
-          fail(401,"invalid token");' >> upload/deployer.php
-
-          printf '%s\n' 'if(!preg_match("/^[0-9]{14}-[a-f0-9]{7}$/",$name))
-          fail(400,"invalid name format");' >> upload/deployer.php
-
-          printf '%s\n' '@mkdir($releases,0755,true); @mkdir($logs,0755,true);'
-          >> upload/deployer.php
-
-          printf '%s\n' '$zip=$releases."/".$name.".zip";
-          $target=$releases."/".$name; $current=$docroot."/current";' >>
-          upload/deployer.php
-
-          printf '%s\n' '$log=$logs."/deploy-".date("Ymd-His").".log";' >>
-          upload/deployer.php
-
-          printf '%s\n' 'file_put_contents($log,"[".date("c")."]
-          ".$name."\n",FILE_APPEND);' >> upload/deployer.php
-
-          printf '%s\n' '$z=new ZipArchive(); if($z->open($zip)!==true)
-          fail(404,"zip not found");' >> upload/deployer.php
-
-          printf '%s\n' '@mkdir($target,0755,true); if(!$z->extractTo($target))
-          fail(500,"extract error"); $z->close();' >> upload/deployer.php
-
-          printf '%s\n' 'file_put_contents($current,$name);' >>
-          upload/deployer.php
-
-          printf '%s\n' '@unlink($zip);' >> upload/deployer.php
-
-          printf '%s\n' '$dirs=array_filter(glob($releases."/*"),"is_dir");
-          usort($dirs,fn($a,$b)=>filemtime($b)<=>filemtime($a));' >>
-          upload/deployer.php
-
-          printf '%s\n' 'foreach(array_slice($dirs,5) as $d){$it=new
-          RecursiveIteratorIterator(new
-          RecursiveDirectoryIterator($d,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);
-          foreach($it as
-          $f){$f->isDir()?@rmdir($f->getPathname()):@unlink($f->getPathname());}
-          @rmdir($d);}' >> upload/deployer.php
-
-          printf '%s\n' 'header("Content-Type: application/json"); echo
-          json_encode(["ok"=>true,"release"=>$name]);' >> upload/deployer.php
-
-
-          # Proteção e token no docroot
-
-          printf '%s\n' 'Options -Indexes' > upload/.htaccess
-
-          printf '%s\n' '<Files ".deploy_token">' >> upload/.htaccess
-
-          printf '%s\n' '  Require all denied' >> upload/.htaccess
-
-          printf '%s\n' '</Files>' >> upload/.htaccess
-
-
+          # Token de deploy
           echo "${{ secrets.DEPLOY_HOOK_TOKEN }}" > upload/.deploy_token
 
+          # Deployer: cria symlink current -> releases/<REL>, fallback edita .htaccess para apontar ao release
+          : > upload/deployer.php
+          printf '%s\n' '<?php' >> upload/deployer.php
+          printf '%s\n' 'declare(strict_types=1);' >> upload/deployer.php
+          printf '%s\n' '$docroot=__DIR__;' >> upload/deployer.php
+          printf '%s\n' '$releasesDir=$docroot."/releases";' >> upload/deployer.php
+          printf '%s\n' '$logsDir=$docroot."/deploy-logs";' >> upload/deployer.php
+          printf '%s\n' '$tokenFile=$docroot."/.deploy_token";' >> upload/deployer.php
+          printf '%s\n' '$htaccess=$docroot."/.htaccess";' >> upload/deployer.php
+          printf '%s\n' '$link=$docroot."/current";' >> upload/deployer.php
+          printf '%s\n' '$marker=$docroot."/current.release";' >> upload/deployer.php
+          printf '%s\n' '@ini_set("max_execution_time","300"); @ini_set("memory_limit","512M");' >> upload/deployer.php
+          printf '%s\n' 'function jfail($c,$m){http_response_code($c);header("Content-Type: application/json");echo json_encode(["ok"=>false,"error"=>$m]);exit;}' >> upload/deployer.php
+          printf '%s\n' '$token=$_GET["token"] ?? ""; $name=$_GET["name"] ?? "";' >> upload/deployer.php
+          printf '%s\n' 'if($token==="") jfail(401,"missing token");' >> upload/deployer.php
+          printf '%s\n' 'if(!is_file($tokenFile)) jfail(500,"token file missing");' >> upload/deployer.php
+          printf '%s\n' 'if(!hash_equals(trim((string)file_get_contents($tokenFile)),$token)) jfail(401,"invalid token");' >> upload/deployer.php
+          printf '%s\n' 'if(!preg_match("/^[0-9]{14}-[a-f0-9]{7}$/",$name)) jfail(400,"invalid name format");' >> upload/deployer.php
+          printf '%s\n' '@mkdir($releasesDir,0755,true); @mkdir($logsDir,0755,true);' >> upload/deployer.php
+          printf '%s\n' '$zip="$releasesDir/$name.zip"; $target="$releasesDir/$name";' >> upload/deployer.php
+          printf '%s\n' '$log=$logsDir."/deploy-".date("Ymd-His").".log";' >> upload/deployer.php
+          printf '%s\n' 'file_put_contents($log,"[".date("c")."] release=$name\n",FILE_APPEND);' >> upload/deployer.php
+          printf '%s\n' '$z=new ZipArchive(); if($z->open($zip)!==true) jfail(404,"zip not found");' >> upload/deployer.php
+          printf '%s\n' '@mkdir($target,0755,true); if(!$z->extractTo($target)) jfail(500,"extract error"); $z->close(); @unlink($zip);' >> upload/deployer.php
+          printf '%s\n' 'file_put_contents($marker,$name);' >> upload/deployer.php
+          printf '%s\n' '$linked=false; if(is_link($link) || is_dir($link)){ @unlink($link); }' >> upload/deployer.php
+          printf '%s\n' 'if(function_exists("symlink")){ $linked=@symlink($target,$link); }' >> upload/deployer.php
+          printf '%s\n' 'if(!$linked){' >> upload/deployer.php
+          printf '%s\n' '  // Fallback: reescreve .htaccess para apontar direto para este release' >> upload/deployer.php
+          printf '%s\n' '  $ht = "Options -Indexes\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "<IfModule mod_rewrite.c>\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteEngine On\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^deployer\\.php$ - [L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^\\.deploy_token - [F,L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteCond %{DOCUMENT_ROOT}/releases/'.$REL.'/public%{REQUEST_URI} -f\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^(.*)$ /releases/'.$REL.'/public/$1 [L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteCond %{REQUEST_FILENAME} -f [OR]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteCond %{REQUEST_FILENAME} -d\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^ - [L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^ index.php [L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "</IfModule>\n";' >> upload/deployer.php
+          printf '%s\n' '  file_put_contents($htaccess,$ht);' >> upload/deployer.php
+          printf '%s\n' '}' >> upload/deployer.php
+          printf '%s\n' '// Limpa releases antigos (mantém 5 últimos)' >> upload/deployer.php
+          printf '%s\n' '$dirs=array_filter(glob($releasesDir."/*"),"is_dir"); usort($dirs,fn($a,$b)=>filemtime($b)<=>filemtime($a));' >> upload/deployer.php
+          printf '%s\n' 'foreach(array_slice($dirs,5) as $d){$it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($d,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST); foreach($it as $f){$f->isDir()?@rmdir($f->getPathname()):@unlink($f->getPathname());} @rmdir($d);}' >> upload/deployer.php
+          printf '%s\n' 'header("Content-Type: application/json"); echo json_encode(["ok"=>true,"release"=>$name,"symlink"=>$linked]);' >> upload/deployer.php
 
-          # index.php "ponte" no docroot (aponta para
-          releases/<current>/public/index.php)
-
-          : > upload/index.php
-
-          printf '%s\n' '<?php' >> upload/index.php
-
-          printf '%s\n' '$rel=@file_get_contents(__DIR__."/current");' >>
-          upload/index.php
-
-          printf '%s\n' '$rel=$rel?trim($rel):"";' >> upload/index.php
-
-          printf '%s\n'
-          'if($rel===""||!is_dir(__DIR__."/releases/".$rel."/public")){http_response_code(503);echo
-          "Deploy incomplete.";exit;}' >> upload/index.php
-
-          printf '%s\n' 'require __DIR__."/releases/".$rel."/public/index.php";'
-          >> upload/index.php
       - name: Debug - local files
         run: |
           echo "ZIP gerado:"
           ls -lh upload/releases/*.zip
           echo "Arquivos no upload/:"
           find upload -maxdepth 2 -type f | sed 's/^/  /'
+
       - name: Upload deployer & token (docroot)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
-          server: '${{ secrets.FTP_SERVER }}'
-          username: '${{ secrets.FTP_USERNAME }}'
-          password: '${{ secrets.FTP_PASSWORD }}'
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
-          server-dir: '${{ secrets.FTP_SERVER_DIR }}/'
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}/
           local-dir: upload/
           exclude: |
             **/releases/**
@@ -237,14 +212,15 @@ jobs:
             **/.github/**
             **/node_modules/**
             **/.env
+
       - name: Upload ZIP to /releases
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
-          server: '${{ secrets.FTP_SERVER }}'
-          username: '${{ secrets.FTP_USERNAME }}'
-          password: '${{ secrets.FTP_PASSWORD }}'
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
-          server-dir: '${{ secrets.FTP_SERVER_DIR }}/releases/'
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}/releases/
           local-dir: upload/releases/
           dangerous-clean-slate: false
           exclude: |
@@ -252,15 +228,26 @@ jobs:
             **/.github/**
             **/node_modules/**
             **/.env
+
+      - name: Validate SITE_BASE_URL
+        run: |
+          set -e
+          if [ -z "${{ secrets.SITE_BASE_URL }}" ]; then
+            echo "::error::Missing secret SITE_BASE_URL (ex.: https://cdn.omixfy.com)"
+            exit 1
+          fi
+          if ! echo "${{ secrets.SITE_BASE_URL }}" | grep -Eqi '^https?://'; then
+            echo "::error::SITE_BASE_URL must start with http:// or https:// (ex.: https://cdn.omixfy.com)"
+            exit 1
+          fi
+          BASE="${{ secrets.SITE_BASE_URL }}"; BASE="${BASE%/}"
+          echo "Deploy endpoint (sanitized): ${BASE}/deployer.php?name=<REL>&token=***"
+
       - name: Trigger remote deploy (unzip & activate)
         env:
-          REL: '${{ env.REL }}'
-        run: >
+          REL: ${{ env.REL }}
+        run: |
           set -e
-
-          URL="${{ secrets.SITE_BASE_URL }}/deployer.php?token=${{
-          secrets.DEPLOY_HOOK_TOKEN }}&name=${REL}"
-
-          echo "Calling: $URL"
-
-          curl -fsS "$URL"
+          BASE="${{ secrets.SITE_BASE_URL }}"; BASE="${BASE%/}"
+          echo "Triggering remote deploy for release ${REL}"
+          curl -fsS "${BASE}/deployer.php?token=${{ secrets.DEPLOY_HOOK_TOKEN }}&name=${REL}" > /dev/null
