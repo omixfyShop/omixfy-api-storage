@@ -43,7 +43,9 @@ jobs:
         run: |
           set -e
           rm -rf deploy
-          mkdir -p deploy/assetsme
+          mkdir -p deploy
+
+          # Copia TODO o projeto para deploy/ (sem .env, node_modules, .github etc.)
           rsync -a \
             --delete \
             --exclude=".git" \
@@ -57,13 +59,13 @@ jobs:
             --exclude="storage/framework/cache/*" \
             --exclude="storage/framework/views/*" \
             --exclude=".ftp-deploy-sync-state.json" \
-            ./ deploy/assetsme/
+            ./ deploy/
 
-          # index.php ponte na raiz pública
-          printf "%s\n" "<?php require __DIR__ . '/assetsme/public/index.php';" > deploy/index.php
+          # index.php ponte na RAIZ do docroot -> public/index.php (sem /assetsme)
+          printf "%s\n" "<?php require __DIR__ . '/public/index.php';" > deploy/index.php
 
           # .htaccess forte em public/assets (sempre cria)
-          mkdir -p deploy/assetsme/public/assets
+          mkdir -p deploy/public/assets
           printf "%s\n" \
             "Options -Indexes" \
             "<FilesMatch \"\\.(php|phar|phtml)$\">" \
@@ -75,7 +77,16 @@ jobs:
             "    Header set Access-Control-Allow-Origin \"*\"" \
             "  </FilesMatch>" \
             "</IfModule>" \
-            > deploy/assetsme/public/assets/.htaccess
+            > deploy/public/assets/.htaccess
+
+          # Sentinela para conferência
+          date -u > deploy/_deploy-check.txt
+
+      - name: Debug - list deploy content
+        run: |
+          echo "---- TREE deploy/ (até 3 níveis) ----"
+          find deploy -maxdepth 3 -type f | sed 's/^/  /'
+          echo "--------------------------------------"
 
       - name: Deploy via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
@@ -84,9 +95,12 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
-          server-dir: /
+          # >>> aponte para o Document Root exato do cdn.omixfy.com (ex.: /public_html ou /public_html/cdn)
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}/
           local-dir: deploy/
           state-name: .ftp-deploy-sync-state.json
+          # Força um full sync no primeiro push para evitar "só pastas"
+          dangerous-clean-slate: true
           exclude: |
             **/.git*
             **/.github/**
