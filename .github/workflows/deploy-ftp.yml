@@ -12,7 +12,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # -------- caches para acelerar --------
+      # PHP (traz o Composer junto)
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, bcmath, pdo_mysql, zip
+          coverage: none
+
+      # Caches (depois do setup-php para garantir composer disponível)
       - name: Get Composer cache dir
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
@@ -24,6 +32,11 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Cache npm
         uses: actions/cache@v4
         with:
@@ -31,38 +44,25 @@ jobs:
           key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
           restore-keys: ${{ runner.os }}-npm-
 
-      # -------- build --------
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: mbstring, intl, bcmath, pdo_mysql, zip
-          coverage: none
-
+      # Build
       - name: Install PHP dependencies (Composer)
         run: composer install --no-dev --prefer-dist --optimize-autoloader
 
-      # Gera APP_KEY só para compilar (não envia .env)
       - name: Prepare .env for build key (not deployed)
         run: |
           if [ ! -f .env ]; then cp .env.example .env; fi
           php artisan key:generate
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - name: Install & Build (Vite)
         run: |
           npm ci
           npm run build
 
-      # -------- empacota como ZIP --------
+      # Cria ZIP + deployer.php + token
       - name: Prepare ZIP artifact
         run: |
           set -e
-          REL=$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}
+          REL="$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
           echo "REL=$REL" >> $GITHUB_ENV
 
           rm -rf release upload
@@ -83,7 +83,7 @@ jobs:
             --exclude="storage/framework/views/*" \
             . ./release/
 
-          # .htaccess forte para assets
+          # .htaccess para assets
           mkdir -p release/public/assets
           cat > release/public/assets/.htaccess <<'HTA'
 Options -Indexes
@@ -98,12 +98,12 @@ Options -Indexes
 </IfModule>
 HTA
 
-          # Gera o ZIP
+          # ZIP do release
           cd release
           zip -r ../upload/releases/${REL}.zip . -q
           cd ..
 
-          # deployer.php + proteção + token (ficam no docroot)
+          # deployer.php (descompacta e ativa o release)
           cat > upload/deployer.php <<'PHP'
 <?php
 declare(strict_types=1);
@@ -119,7 +119,7 @@ function fail($c,$m){http_response_code($c);header('Content-Type: application/js
 $token = $_GET['token'] ?? ''; $name = $_GET['name'] ?? '';
 if ($token==='') fail(401,'missing token');
 if (!is_file($tokenFile)) fail(500,'token file missing');
-if (!hash_equals(trim(file_get_contents($tokenFile)), $token)) fail(401,'invalid token');
+if (!hash_equals(trim((string)file_get_contents($tokenFile)), $token)) fail(401,'invalid token');
 if (!preg_match('/^[0-9]{14}-[a-f0-9]{7}$/',$name)) fail(400,'invalid name format');
 @mkdir($releasesDir,0755,true); @mkdir($logsDir,0755,true);
 $zipPath = "$releasesDir/$name.zip"; $target = "$releasesDir/$name";
@@ -141,6 +141,7 @@ foreach(array_slice($dirs,5) as $d){$it=new RecursiveIteratorIterator(new Recurs
 header('Content-Type: application/json'); echo json_encode(['ok'=>true,'release'=>$name]);
 PHP
 
+          # Proteção e token
           cat > upload/.htaccess <<'HTDOC'
 Options -Indexes
 <Files ".deploy_token">
@@ -154,10 +155,10 @@ HTDOC
         run: |
           echo "ZIP gerado:"
           ls -lh upload/releases/*.zip
-          echo "Deployer e token:"
-          ls -la upload | sed 's/^/  /'
+          echo "Arquivos no upload/:"
+          find upload -maxdepth 2 -type f | sed 's/^/  /'
 
-      # -------- upload via FTPS --------
+      # Sobe deployer.php, token e .htaccess (docroot)
       - name: Upload deployer & token (docroot)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
@@ -174,6 +175,7 @@ HTDOC
             **/node_modules/**
             **/.env
 
+      # Sobe apenas o ZIP para /releases
       - name: Upload ZIP to /releases
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
@@ -190,9 +192,10 @@ HTDOC
             **/node_modules/**
             **/.env
 
-      # -------- dispara descompactação --------
+      # Dispara a descompactação/ativação
       - name: Trigger remote deploy (unzip & activate)
-        env: { REL: ${{ env.REL }} }
+        env:
+          REL: ${{ env.REL }}
         run: |
           set -e
           URL="${{ secrets.SITE_BASE_URL }}/deployer.php?token=${{ secrets.DEPLOY_HOOK_TOKEN }}&name=${REL}"
