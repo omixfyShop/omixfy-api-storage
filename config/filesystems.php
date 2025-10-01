@@ -47,6 +47,13 @@ return [
             'report' => false,
         ],
 
+        'assets' => [
+            'driver' => 'local',
+            'root' => public_path('assets'),
+            'url' => env('ASSETS_BASE_URL', env('APP_URL').'/assets'),
+            'throw' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
@@ -76,5 +83,8 @@ return [
     'links' => [
         public_path('storage') => storage_path('app/public'),
     ],
+
+    'assets_disk' => env('ASSETS_DISK', 'assets'),
+    'assets_max_file_size' => (int) env('ASSETS_MAX_FILE_SIZE', 10 * 1024 * 1024),
 
 ];
