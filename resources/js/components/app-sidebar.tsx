@@ -13,7 +13,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-react';
+import { BookOpen, CloudUpload, Folder, LayoutGrid, List } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -21,6 +21,16 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Upload de Assets',
+        href: '/assets/upload',
+        icon: CloudUpload,
+    },
+    {
+        title: 'Listar Assets',
+        href: '/assets/list',
+        icon: List,
     },
 ];
 
