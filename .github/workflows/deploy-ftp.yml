@@ -23,7 +23,7 @@ jobs:
       - name: Install PHP dependencies (Composer)
         run: composer install --no-dev --prefer-dist --optimize-autoloader
 
-      # Apenas para gerar APP_KEY durante o build (NÃO sobe .env)
+      # Apenas para gerar APP_KEY durante o build (NÃO envia .env)
       - name: Prepare .env for build key (not deployed)
         run: |
           if [ ! -f .env ]; then cp .env.example .env; fi
@@ -40,9 +40,8 @@ jobs:
           npm run build
 
       - name: Prepare deploy folder
-        shell: bash
         run: |
-          set -euo pipefail
+          set -e
           rm -rf deploy
           mkdir -p deploy/assetsme
           rsync -a \
@@ -61,28 +60,22 @@ jobs:
             ./ deploy/assetsme/
 
           # index.php ponte na raiz pública
-          cat > deploy/index.php <<'PHP'
-<?php require __DIR__ . '/assetsme/public/index.php';
-PHP
+          printf "%s\n" "<?php require __DIR__ . '/assetsme/public/index.php';" > deploy/index.php
 
-          # .htaccess forte em public/assets (cria se não existir)
+          # .htaccess forte em public/assets (sempre cria)
           mkdir -p deploy/assetsme/public/assets
-          if [ -f public/assets/.htaccess ]; then
-            cp public/assets/.htaccess deploy/assetsme/public/assets/.htaccess
-          else
-            cat > deploy/assetsme/public/assets/.htaccess <<'HTACCESS'
-Options -Indexes
-<FilesMatch "\.(php|phar|phtml)$">
-  Deny from all
-</FilesMatch>
-<IfModule mod_headers.c>
-  <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|css|js|woff2?)$">
-    Header set Cache-Control "public, max-age=31536000, immutable"
-    Header set Access-Control-Allow-Origin "*"
-  </FilesMatch>
-</IfModule>
-HTACCESS
-          fi
+          printf "%s\n" \
+            "Options -Indexes" \
+            "<FilesMatch \"\\.(php|phar|phtml)$\">" \
+            "  Deny from all" \
+            "</FilesMatch>" \
+            "<IfModule mod_headers.c>" \
+            "  <FilesMatch \"\\.(jpg|jpeg|png|gif|webp|svg|css|js|woff2?)$\">" \
+            "    Header set Cache-Control \"public, max-age=31536000, immutable\"" \
+            "    Header set Access-Control-Allow-Origin \"*\"" \
+            "  </FilesMatch>" \
+            "</IfModule>" \
+            > deploy/assetsme/public/assets/.htaccess
 
       - name: Deploy via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4
