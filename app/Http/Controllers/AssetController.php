@@ -67,6 +67,8 @@ class AssetController extends Controller
 
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
 
+        $tokenUserId = $request->attributes->get('token_user_id');
+
         foreach ($uploadedFiles as $file) {
             if (! $file->isValid()) {
                 return $this->validationErrorResponse(['files' => ['One or more files are invalid.']]);
@@ -114,7 +116,7 @@ class AssetController extends Controller
                 'mime' => $detectedMime,
                 'size' => $file->getSize(),
                 'checksum' => hash_file('sha256', $file->getRealPath()),
-                'uploaded_by' => $request->user()?->id,
+                'uploaded_by' => $request->user()?->id ?? $tokenUserId,
             ]);
 
             $results[] = [

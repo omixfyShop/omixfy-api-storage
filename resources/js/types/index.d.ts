@@ -74,3 +74,11 @@ export interface ApiResponse<T> {
 }
 
 export type UploadStatus = 'idle' | 'uploading' | 'done';
+
+export interface AccessTokenItem {
+    id: string;
+    name: string | null;
+    preview: string | null;
+    created_at: string;
+    last_used_at: string | null;
+}

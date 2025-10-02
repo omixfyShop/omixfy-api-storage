@@ -29,12 +29,11 @@ AssetsMe é um gerenciador de arquivos estáticos construído com Laravel 11, In
 
 3. Ajuste os valores a seguir no `.env`:
 
-   - `ASSETSME_TOKEN`: token fixo de 64 caracteres usado pela API e pelo painel.
    - `ASSETS_DISK`: disco Laravel utilizado para armazenar os arquivos (padrão `assets`).
    - `ASSETS_BASE_URL`: URL pública base para servir os arquivos em `public/assets`.
    - `ASSETS_MAX_FILE_SIZE`: limite de upload em bytes (padrão 10 MB).
    - `VITE_API_BASE_URL`: endereço base para o cliente React alcançar a API (ex.: `http://localhost`).
-   - `VITE_ASSETSME_TOKEN`: token utilizado pelo painel para enviar requisições à API (use o mesmo do backend).
+   - `VITE_ASSETSME_TOKEN`: token utilizado pelo painel para enviar requisições à API (defina com um token gerado no menu **Tokens** do painel).
 
 4. Execute as migrações do banco:
 
@@ -57,9 +56,54 @@ AssetsMe é um gerenciador de arquivos estáticos construído com Laravel 11, In
 
 A aplicação estará disponível em `http://localhost:8000` com assets acessíveis diretamente via `http://localhost:8000/assets/...`.
 
+## Tokens fixos
+
+Os endpoints da API exigem tokens permanentes vinculados a um usuário. Cada token é único, não expira e pode ser revogado a
+qualquer momento.
+
+### Criando tokens pelo painel
+
+1. Autentique-se no painel e abra o menu **Tokens**.
+2. Clique em **Criar token**, informe um nome opcional e confirme.
+3. O token gerado será exibido apenas uma vez em um modal. Copie-o imediatamente e armazene com segurança.
+4. Utilize a coluna "Prévia" para identificar tokens existentes e remova-os quando não forem mais necessários.
+
+### Criando tokens via CLI
+
+```
+php artisan assetsme:token {user} {--name=}
+```
+
+- `{user}` aceita o ID numérico ou o e-mail do usuário.
+- `--name=` define um rótulo opcional para facilitar a identificação do token.
+
+Exemplo:
+
+```
+php artisan assetsme:token admin@example.com --name="Integração CI"
+```
+
+### Utilizando tokens na API
+
+Os tokens podem ser informados de três maneiras:
+
+- Header `Authorization: Bearer <TOKEN>`.
+- Header `X-AssetsMe-Token: <TOKEN>`.
+- Query string `?token=<TOKEN>` (fallback útil para integrações simples).
+
+Defina uma variável de ambiente temporária e reutilize nos exemplos abaixo:
+
+```bash
+TOKEN="seu-token-copiado"
+```
+
+Os arquivos publicados continuam acessíveis diretamente pela URL pública (ex.: `https://seu-dominio.com/assets/banner.jpg`) sem
+qualquer verificação de token.
+
 ## API HTTP
 
-Todas as rotas ficam sob `/api` e exigem o header `Authorization: Bearer <ASSETSME_TOKEN>`, exceto o health check.
+Todas as rotas ficam sob `/api` e exigem um token válido (veja "Tokens fixos"). Utilize `Authorization: Bearer $TOKEN`,
+`X-AssetsMe-Token: $TOKEN` ou o query param `?token=$TOKEN`, exceto no health check.
 
 ### Health check
 
@@ -72,7 +116,7 @@ Response: { "ok": true }
 
 ```bash
 curl -X POST "http://localhost:8000/api/assets/upload?folder=produtos/2025" \
-  -H "Authorization: Bearer $ASSETSME_TOKEN" \
+  -H "Authorization: Bearer $TOKEN" \
   -F "files[]=@/caminho/foto1.png" \
   -F "files[]=@/caminho/foto2.jpg"
 ```
@@ -85,7 +129,7 @@ curl -X POST "http://localhost:8000/api/assets/upload?folder=produtos/2025" \
 
 ```bash
 curl -X GET "http://localhost:8000/api/assets/list?folder=produtos/2025" \
-  -H "Authorization: Bearer $ASSETSME_TOKEN"
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 - Suporta `page` e `per_page` (máximo 100) para paginação simples.
@@ -95,7 +139,7 @@ curl -X GET "http://localhost:8000/api/assets/list?folder=produtos/2025" \
 
 ```bash
 curl -X DELETE "http://localhost:8000/api/assets/file?path=produtos/2025/foto1.png" \
-  -H "Authorization: Bearer $ASSETSME_TOKEN"
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 - Remove o arquivo físico em `public/assets` e o registro na tabela `assets`.
@@ -107,8 +151,9 @@ O painel utiliza autenticação padrão do Laravel Breeze. Após realizar login:
 
 - **Upload** (`/assets/upload`): interface com drag-and-drop, seleção de pasta, barra de progresso e retorno das URLs com botão "Copiar".
 - **Listagem** (`/assets/list`): tabela com filtro por pasta, paginação, botões de copiar URL e remover asset.
+- **Tokens** (`/tokens`): listagem dos tokens vinculados ao usuário, criação de novos tokens (exibidos uma única vez) e exclusão segura.
 
-As chamadas ao backend são feitas via `fetch` utilizando `Authorization: Bearer ${import.meta.env.VITE_ASSETSME_TOKEN}`. O token não é exibido na interface.
+As chamadas ao backend são feitas via `fetch` utilizando `Authorization: Bearer ${import.meta.env.VITE_ASSETSME_TOKEN}`. Configure esta variável com um token criado no menu **Tokens**; ele não é exibido na interface.
 
 ## Segurança e cache
 
