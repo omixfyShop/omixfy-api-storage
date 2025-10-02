@@ -13,11 +13,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('dashboard');
 
     Route::get('assets/upload', function () {
-        return Inertia::render('Assets/Upload');
+        return Inertia::render('assets/upload');
     })->name('assets.upload');
 
     Route::get('assets/list', function () {
-        return Inertia::render('Assets/List');
+        return Inertia::render('assets/list');
     })->name('assets.list');
 });
 
