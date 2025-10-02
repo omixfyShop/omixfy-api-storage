@@ -41,3 +41,36 @@ export interface User {
     updated_at: string;
     [key: string]: unknown; // This allows for additional properties...
 }
+
+export interface Asset {
+    path: string;
+    original_name: string;
+    url: string;
+    mime: string;
+    size: number;
+    folder?: string;
+}
+
+export interface AssetUploadResult {
+    path: string;
+    original_name: string;
+    url: string;
+    mime: string;
+    size: number;
+}
+
+export interface PaginationMeta {
+    current_page: number;
+    per_page: number;
+    next_page_url: string | null;
+    prev_page_url: string | null;
+}
+
+export interface ApiResponse<T> {
+    data: T;
+    meta?: PaginationMeta;
+    message?: string;
+    errors?: Record<string, string[]>;
+}
+
+export type UploadStatus = 'idle' | 'uploading' | 'done';

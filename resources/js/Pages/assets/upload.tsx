@@ -2,8 +2,9 @@ import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { CloudUpload, Copy, FolderInput, Loader2, X } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
+import type { AssetUploadResult, UploadStatus } from '@/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const TOKEN = import.meta.env.VITE_ASSETSME_TOKEN ?? '';
 
 const breadcrumbs = [
@@ -11,7 +12,7 @@ const breadcrumbs = [
     { title: 'Assets', href: '/assets/upload' },
 ];
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined | null): string {
     if (!bytes && bytes !== 0) {
         return '—';
     }
@@ -26,32 +27,35 @@ function formatBytes(bytes) {
     return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
-function buildEndpoint(path, params = {}) {
+function buildEndpoint(path: string, params: Record<string, string | number | undefined | null> = {}): string {
     const base = API_BASE_URL || window.location.origin;
     const url = new URL(path, base.endsWith('/') ? base : `${base}/`);
 
     Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
-            url.searchParams.set(key, value);
+            url.searchParams.set(key, String(value));
         }
     });
 
     return url.toString();
 }
 
-function extractErrorMessage(payload, fallback) {
+function extractErrorMessage(payload: unknown, fallback: string): string {
     if (!payload || typeof payload !== 'object') {
         return fallback;
     }
 
-    if (typeof payload.message === 'string' && payload.message.trim() !== '') {
-        return payload.message;
+    const obj = payload as Record<string, unknown>;
+
+    if (typeof obj.message === 'string' && obj.message.trim() !== '') {
+        return obj.message;
     }
 
-    if (payload.errors && typeof payload.errors === 'object') {
-        const [firstKey] = Object.keys(payload.errors);
+    if (obj.errors && typeof obj.errors === 'object') {
+        const errors = obj.errors as Record<string, unknown>;
+        const [firstKey] = Object.keys(errors);
         if (firstKey) {
-            const messages = payload.errors[firstKey];
+            const messages = errors[firstKey];
             if (Array.isArray(messages) && messages.length > 0) {
                 return String(messages[0]);
             }
@@ -62,25 +66,25 @@ function extractErrorMessage(payload, fallback) {
 }
 
 export default function Upload() {
-    const [folder, setFolder] = useState('');
-    const [files, setFiles] = useState([]);
-    const [isDragging, setIsDragging] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [status, setStatus] = useState('idle');
-    const [error, setError] = useState('');
-    const [results, setResults] = useState([]);
-    const fileInputRef = useRef(null);
+    const [folder, setFolder] = useState<string>('');
+    const [files, setFiles] = useState<File[]>([]);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
+    const [progress, setProgress] = useState<number>(0);
+    const [status, setStatus] = useState<UploadStatus>('idle');
+    const [error, setError] = useState<string>('');
+    const [results, setResults] = useState<AssetUploadResult[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const hasToken = TOKEN && TOKEN !== '';
 
-    const onFilesSelected = useCallback((fileList) => {
+    const onFilesSelected = useCallback((fileList: FileList | null) => {
         const items = Array.from(fileList ?? []);
         if (!items.length) {
             return;
         }
         setFiles((current) => {
             const merged = [...current, ...items];
-            const map = new Map();
+            const map = new Map<string, File>();
             merged.forEach((item) => {
                 map.set(`${item.name}-${item.size}-${item.lastModified}`, item);
             });
@@ -88,12 +92,12 @@ export default function Upload() {
         });
     }, []);
 
-    const handleFileInputChange = useCallback((event) => {
+    const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         onFilesSelected(event.target.files);
         event.target.value = '';
     }, [onFilesSelected]);
 
-    const handleDragOver = useCallback((event) => {
+    const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();
         event.stopPropagation();
         if (!isDragging) {
@@ -101,7 +105,7 @@ export default function Upload() {
         }
     }, [isDragging]);
 
-    const handleDragLeave = useCallback((event) => {
+    const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();
         event.stopPropagation();
         if (isDragging) {
@@ -109,7 +113,7 @@ export default function Upload() {
         }
     }, [isDragging]);
 
-    const handleDrop = useCallback((event) => {
+    const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();
         event.stopPropagation();
         setIsDragging(false);
@@ -164,28 +168,28 @@ export default function Upload() {
                         setError(message);
                         setStatus('idle');
                     }
-                } catch (parseError) {
+                } catch {
                     setError('Erro ao processar a resposta do servidor.');
                     setStatus('idle');
                 }
-                resolve();
+                resolve(undefined);
             };
 
             xhr.onerror = () => {
                 setError('Erro de rede durante o upload.');
                 setStatus('idle');
-                resolve();
+                resolve(undefined);
             };
 
             xhr.send(formData);
         });
     }, [files, folder, hasToken]);
 
-    const removeFile = useCallback((file) => {
+    const removeFile = useCallback((file: File) => {
         setFiles((current) => current.filter((item) => item !== file));
     }, []);
 
-    const copyToClipboard = useCallback(async (value) => {
+    const copyToClipboard = useCallback(async (value: string) => {
         if (!value) {
             return;
         }
@@ -253,7 +257,7 @@ export default function Upload() {
                                     id="folder-input"
                                     type="text"
                                     value={folder}
-                                    onChange={(event) => setFolder(event.target.value)}
+                                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFolder(event.target.value)}
                                     placeholder="Ex.: produtos/2025"
                                     className="flex-1 bg-transparent text-sm outline-none"
                                 />

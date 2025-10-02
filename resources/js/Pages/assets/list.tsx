@@ -2,8 +2,9 @@ import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { Copy, Loader2, RefreshCcw, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Asset, PaginationMeta } from '@/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const TOKEN = import.meta.env.VITE_ASSETSME_TOKEN ?? '';
 
 const breadcrumbs = [
@@ -11,20 +12,20 @@ const breadcrumbs = [
     { title: 'Assets', href: '/assets/list' },
 ];
 
-function buildEndpoint(path, params = {}) {
+function buildEndpoint(path: string, params: Record<string, string | number | undefined | null> = {}): string {
     const base = API_BASE_URL || window.location.origin;
     const url = new URL(path, base.endsWith('/') ? base : `${base}/`);
 
     Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
-            url.searchParams.set(key, value);
+            url.searchParams.set(key, String(value));
         }
     });
 
     return url.toString();
 }
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined | null): string {
     if (!bytes && bytes !== 0) {
         return '—';
     }
@@ -39,19 +40,22 @@ function formatBytes(bytes) {
     return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
-function extractErrorMessage(payload, fallback) {
+function extractErrorMessage(payload: unknown, fallback: string): string {
     if (!payload || typeof payload !== 'object') {
         return fallback;
     }
 
-    if (typeof payload.message === 'string' && payload.message.trim() !== '') {
-        return payload.message;
+    const obj = payload as Record<string, unknown>;
+
+    if (typeof obj.message === 'string' && obj.message.trim() !== '') {
+        return obj.message;
     }
 
-    if (payload.errors && typeof payload.errors === 'object') {
-        const [firstKey] = Object.keys(payload.errors);
+    if (obj.errors && typeof obj.errors === 'object') {
+        const errors = obj.errors as Record<string, unknown>;
+        const [firstKey] = Object.keys(errors);
         if (firstKey) {
-            const messages = payload.errors[firstKey];
+            const messages = errors[firstKey];
             if (Array.isArray(messages) && messages.length > 0) {
                 return String(messages[0]);
             }
@@ -62,19 +66,19 @@ function extractErrorMessage(payload, fallback) {
 }
 
 export default function List() {
-    const [folder, setFolder] = useState('');
-    const [assets, setAssets] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [page, setPage] = useState(1);
-    const [appliedFolder, setAppliedFolder] = useState('');
-    const [meta, setMeta] = useState({ current_page: 1, per_page: 25, next_page_url: null, prev_page_url: null });
+    const [folder, setFolder] = useState<string>('');
+    const [assets, setAssets] = useState<Asset[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string>('');
+    const [page, setPage] = useState<number>(1);
+    const [appliedFolder, setAppliedFolder] = useState<string>('');
+    const [meta, setMeta] = useState<PaginationMeta>({ current_page: 1, per_page: 25, next_page_url: null, prev_page_url: null });
 
     const hasToken = TOKEN && TOKEN !== '';
     const perPage = 25;
 
     const fetchAssets = useCallback(
-        async (targetPage = page, targetFolder = appliedFolder) => {
+        async (targetPage: number = page, targetFolder: string = appliedFolder) => {
             if (!hasToken) {
                 setError('O token de acesso não está configurado.');
                 return;
@@ -129,7 +133,7 @@ export default function List() {
     }, [fetchAssets]);
 
     const handleFilterSubmit = useCallback(
-        (event) => {
+        (event: React.FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             setAppliedFolder(folder.trim());
             setPage(1);
@@ -137,7 +141,7 @@ export default function List() {
         [folder],
     );
 
-    const copyToClipboard = useCallback(async (value) => {
+    const copyToClipboard = useCallback(async (value: string) => {
         if (!value) {
             return;
         }
@@ -150,7 +154,7 @@ export default function List() {
     }, []);
 
     const handleDelete = useCallback(
-        async (asset) => {
+        async (asset: Asset) => {
             if (!asset?.path) {
                 return;
             }
@@ -236,7 +240,7 @@ export default function List() {
                                     id="folder-filter"
                                     type="text"
                                     value={folder}
-                                    onChange={(event) => setFolder(event.target.value)}
+                                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFolder(event.target.value)}
                                     placeholder="Ex.: produtos/2025"
                                     className="flex-1 bg-transparent text-sm outline-none"
                                 />
