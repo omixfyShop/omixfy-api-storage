@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\TokenController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -19,6 +20,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('assets/list', function () {
         return Inertia::render('assets/list');
     })->name('assets.list');
+
+    Route::resource('tokens', TokenController::class)->only(['index', 'store', 'destroy']);
 });
 
 require __DIR__.'/settings.php';

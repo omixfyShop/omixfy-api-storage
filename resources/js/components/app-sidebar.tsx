@@ -13,7 +13,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, CloudUpload, Folder, LayoutGrid, List } from 'lucide-react';
+import { BookOpen, CloudUpload, Folder, KeyRound, LayoutGrid, List } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -31,6 +31,11 @@ const mainNavItems: NavItem[] = [
         title: 'Listar Assets',
         href: '/assets/list',
         icon: List,
+    },
+    {
+        title: 'Tokens',
+        href: '/tokens',
+        icon: KeyRound,
     },
 ];
 
