@@ -12,11 +12,11 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
-import { BookOpen, CloudUpload, Folder, KeyRound, LayoutGrid, List } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { BookOpen, CloudUpload, Folder, KeyRound, LayoutGrid, List, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
-const mainNavItems: NavItem[] = [
+const baseNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
@@ -53,6 +53,12 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const page = usePage<{ auth: { user?: { is_master?: boolean } | null } }>();
+    const isMaster = Boolean(page.props.auth?.user?.is_master);
+    const mainNavItems = isMaster
+        ? [...baseNavItems, { title: 'Usuários', href: '/admin/users', icon: Users }]
+        : baseNavItems;
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>

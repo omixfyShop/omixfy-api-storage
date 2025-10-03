@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\UsersPageController;
 use App\Http\Controllers\TokenController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -22,6 +25,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('assets.list');
 
     Route::resource('tokens', TokenController::class)->only(['index', 'store', 'destroy']);
+
+    Route::get('admin/users', UsersPageController::class)->name('admin.users.index');
+});
+
+Route::middleware(['auth', 'verified'])->prefix('api/admin')->group(function () {
+    Route::get('users', [AdminUserController::class, 'index']);
+    Route::post('users', [AdminUserController::class, 'store']);
+    Route::delete('users/{user}', [AdminUserController::class, 'destroy']);
+
+    Route::get('settings/registration', [AdminSettingsController::class, 'showRegistration']);
+    Route::put('settings/registration', [AdminSettingsController::class, 'updateRegistration']);
 });
 
 require __DIR__.'/settings.php';
