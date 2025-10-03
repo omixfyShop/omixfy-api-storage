@@ -48,10 +48,11 @@ return [
         ],
 
         'assets' => [
-            'driver' => 'local',
-            'root' => public_path('assets'),
-            'url' => env('ASSETS_BASE_URL', env('APP_URL').'/assets'),
-            'throw' => false,
+            'driver'     => 'local',
+            'root'       => dirname(dirname(base_path())) . '/assets',
+            'url'        => env('ASSETS_BASE_URL', '/assets'),
+            'visibility' => 'public',
+            'throw'      => false,
         ],
 
         's3' => [
