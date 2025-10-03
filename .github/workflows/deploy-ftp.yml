@@ -134,8 +134,9 @@ jobs:
           printf '%s\n' '  RewriteRule ^composer\.(json|lock)$ - [F,L]' >> upload/.htaccess
           printf '%s\n' '  RewriteRule ^package\.json$ - [F,L]' >> upload/.htaccess
           printf '%s\n' '  # estáticos via symlink "current" (se existir)' >> upload/.htaccess
-          printf '%s\n' '  RewriteCond %{DOCUMENT_ROOT}/current/public%{REQUEST_URI} -f' >> upload/.htaccess
-          printf '%s\n' '  RewriteRule ^(.*)$ /current/public/\$1 [L]' >> upload/.htaccess
+          printf '%s\n' '  RewriteCond %{DOCUMENT_ROOT}/current/public%{REQUEST_URI} -f [OR]' >> upload/.htaccess
+          printf '%s\n' '  RewriteCond %{DOCUMENT_ROOT}/current/public%{REQUEST_URI} -d' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^(.*)$ /current/public/$1 [L]' >> upload/.htaccess
           printf '%s\n' '  # se arquivo/pasta real no docroot, serve' >> upload/.htaccess
           printf '%s\n' '  RewriteCond %{REQUEST_FILENAME} -f [OR]' >> upload/.htaccess
           printf '%s\n' '  RewriteCond %{REQUEST_FILENAME} -d' >> upload/.htaccess
@@ -172,7 +173,15 @@ jobs:
           printf '%s\n' '$z=new ZipArchive(); if($z->open($zip)!==true) jfail(404,"zip not found");' >> upload/deployer.php
           printf '%s\n' '@mkdir($target,0755,true); if(!$z->extractTo($target)) jfail(500,"extract error"); $z->close(); @unlink($zip);' >> upload/deployer.php
           printf '%s\n' 'file_put_contents($marker,$name);' >> upload/deployer.php
-          printf '%s\n' '$linked=false; if(is_link($link) || is_dir($link)){ @unlink($link); }' >> upload/deployer.php
+
+          # ===== CHANGED: remoção segura do "current" quando for pasta =====
+          printf '%s\n' '$linked=false;' >> upload/deployer.php
+          printf '%s\n' 'if(is_link($link)) { @unlink($link); } elseif (is_dir($link)) {' >> upload/deployer.php
+          printf '%s\n' '  $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($link,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);' >> upload/deployer.php
+          printf '%s\n' '  foreach($it as $f){ $f->isDir()?@rmdir($f->getPathname()):@unlink($f->getPathname()); }' >> upload/deployer.php
+          printf '%s\n' '  @rmdir($link);' >> upload/deployer.php
+          printf '%s\n' '}' >> upload/deployer.php
+
           printf '%s\n' 'if(function_exists("symlink")){ $linked=@symlink($target,$link); }' >> upload/deployer.php
           printf '%s\n' 'if(!$linked){' >> upload/deployer.php
           printf '%s\n' '  // Fallback: reescreve .htaccess para apontar direto para este release' >> upload/deployer.php
@@ -186,8 +195,12 @@ jobs:
           printf '%s\n' '  $ht.= "  RewriteRule ^artisan$ - [F,L]\n";' >> upload/deployer.php
           printf '%s\n' '  $ht.= "  RewriteRule ^composer\\.(json|lock)$ - [F,L]\n";' >> upload/deployer.php
           printf '%s\n' '  $ht.= "  RewriteRule ^package\\.json$ - [F,L]\n";' >> upload/deployer.php
-          printf '%s\n' '  $ht.= "  RewriteCond %{DOCUMENT_ROOT}/releases/'.$REL.'/public%{REQUEST_URI} -f\n";' >> upload/deployer.php
-          printf '%s\n' '  $ht.= "  RewriteRule ^(.*)$ /releases/'.$REL.'/public/$1 [L]\n";' >> upload/deployer.php
+
+          # ===== CHANGED: usa $name e cobre -f OR -d =====
+          printf '%s\n' '  $ht.= "  RewriteCond %{DOCUMENT_ROOT}/releases/{$name}/public%{REQUEST_URI} -f [OR]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteCond %{DOCUMENT_ROOT}/releases/{$name}/public%{REQUEST_URI} -d\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^(.*)$ /releases/{$name}/public/$1 [L]\n";' >> upload/deployer.php
+
           printf '%s\n' '  $ht.= "  RewriteCond %{REQUEST_FILENAME} -f [OR]\n";' >> upload/deployer.php
           printf '%s\n' '  $ht.= "  RewriteCond %{REQUEST_FILENAME} -d\n";' >> upload/deployer.php
           printf '%s\n' '  $ht.= "  RewriteRule ^ - [L]\n";' >> upload/deployer.php
