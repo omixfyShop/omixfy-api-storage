@@ -34,6 +34,7 @@ AssetsMe é um gerenciador de arquivos estáticos construído com Laravel 11, In
    - `ASSETS_MAX_FILE_SIZE`: limite de upload em bytes (padrão 10 MB).
    - `VITE_API_BASE_URL`: endereço base para o cliente React alcançar a API (ex.: `http://localhost`).
    - `VITE_ASSETSME_TOKEN`: token utilizado pelo painel para enviar requisições à API (defina com um token gerado no menu **Tokens** do painel).
+   - `REGISTRATION_DEV_ALWAYS_OPEN` (opcional): defina como `true` para manter o formulário de cadastro público liberado em ambientes de desenvolvimento.
 
 4. Execute as migrações do banco:
 
@@ -152,6 +153,9 @@ O painel utiliza autenticação padrão do Laravel Breeze. Após realizar login:
 - **Upload** (`/assets/upload`): interface com drag-and-drop, seleção de pasta, barra de progresso e retorno das URLs com botão "Copiar".
 - **Listagem** (`/assets/list`): tabela com filtro por pasta, paginação, botões de copiar URL e remover asset.
 - **Tokens** (`/tokens`): listagem dos tokens vinculados ao usuário, criação de novos tokens (exibidos uma única vez) e exclusão segura.
+- **Usuários** (`/admin/users`): disponível apenas para o usuário master. Permite habilitar/desabilitar o cadastro público, criar usuários manualmente (com geração opcional de senha) e visualizar quem é o master.
+
+O primeiro usuário criado na plataforma é marcado automaticamente como **master**. Após esse cadastro inicial, o registro público é desabilitado até que o master o reative manualmente. Você pode reabrir ou encerrar o cadastro a qualquer momento pelo painel em **Usuários → Habilitar cadastro** ou persistindo o valor em `settings.registration_enabled` via seeders/migrations.
 
 As chamadas ao backend são feitas via `fetch` utilizando `Authorization: Bearer ${import.meta.env.VITE_ASSETSME_TOKEN}`. Configure esta variável com um token criado no menu **Tokens**; ele não é exibido na interface.
 
