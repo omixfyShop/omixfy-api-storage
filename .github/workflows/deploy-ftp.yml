@@ -126,8 +126,13 @@ jobs:
           printf '%s\n' '  RewriteEngine On' >> upload/.htaccess
           printf '%s\n' '  # permite chamar o deployer' >> upload/.htaccess
           printf '%s\n' '  RewriteRule ^deployer\.php$ - [L]' >> upload/.htaccess
-          printf '%s\n' '  # protege token' >> upload/.htaccess
+          printf '%s\n' '  # protege token e arquivos sensíveis' >> upload/.htaccess
           printf '%s\n' '  RewriteRule ^\.deploy_token - [F,L]' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^\.env$ - [F,L]' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^\.env\..*$ - [F,L]' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^artisan$ - [F,L]' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^composer\.(json|lock)$ - [F,L]' >> upload/.htaccess
+          printf '%s\n' '  RewriteRule ^package\.json$ - [F,L]' >> upload/.htaccess
           printf '%s\n' '  # estáticos via symlink "current" (se existir)' >> upload/.htaccess
           printf '%s\n' '  RewriteCond %{DOCUMENT_ROOT}/current/public%{REQUEST_URI} -f' >> upload/.htaccess
           printf '%s\n' '  RewriteRule ^(.*)$ /current/public/\$1 [L]' >> upload/.htaccess
@@ -176,6 +181,11 @@ jobs:
           printf '%s\n' '  $ht.= "  RewriteEngine On\n";' >> upload/deployer.php
           printf '%s\n' '  $ht.= "  RewriteRule ^deployer\\.php$ - [L]\n";' >> upload/deployer.php
           printf '%s\n' '  $ht.= "  RewriteRule ^\\.deploy_token - [F,L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^\\.env$ - [F,L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^\\.env\\..*$ - [F,L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^artisan$ - [F,L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^composer\\.(json|lock)$ - [F,L]\n";' >> upload/deployer.php
+          printf '%s\n' '  $ht.= "  RewriteRule ^package\\.json$ - [F,L]\n";' >> upload/deployer.php
           printf '%s\n' '  $ht.= "  RewriteCond %{DOCUMENT_ROOT}/releases/'.$REL.'/public%{REQUEST_URI} -f\n";' >> upload/deployer.php
           printf '%s\n' '  $ht.= "  RewriteRule ^(.*)$ /releases/'.$REL.'/public/$1 [L]\n";' >> upload/deployer.php
           printf '%s\n' '  $ht.= "  RewriteCond %{REQUEST_FILENAME} -f [OR]\n";' >> upload/deployer.php
@@ -188,6 +198,13 @@ jobs:
           printf '%s\n' '// Limpa releases antigos (mantém 5 últimos)' >> upload/deployer.php
           printf '%s\n' '$dirs=array_filter(glob($releasesDir."/*"),"is_dir"); usort($dirs,fn($a,$b)=>filemtime($b)<=>filemtime($a));' >> upload/deployer.php
           printf '%s\n' 'foreach(array_slice($dirs,5) as $d){$it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($d,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST); foreach($it as $f){$f->isDir()?@rmdir($f->getPathname()):@unlink($f->getPathname());} @rmdir($d);}' >> upload/deployer.php
+          printf '%s\n' '// Copia arquivo .env da raiz para o release atual (se existir)' >> upload/deployer.php
+          printf '%s\n' '$envSource=$docroot."/.env"; $envTarget=$target."/.env";' >> upload/deployer.php
+          printf '%s\n' 'if(is_file($envSource)){' >> upload/deployer.php
+          printf '%s\n' '  $content=file_get_contents($envSource); file_put_contents($envTarget,$content); file_put_contents($log,"[".date("c")."] .env copied to release\n",FILE_APPEND);' >> upload/deployer.php
+          printf '%s\n' '}else{' >> upload/deployer.php
+          printf '%s\n' '  file_put_contents($log,"[".date("c")."] .env not found in docroot\n",FILE_APPEND);' >> upload/deployer.php
+          printf '%s\n' '}' >> upload/deployer.php
           printf '%s\n' 'header("Content-Type: application/json"); echo json_encode(["ok"=>true,"release"=>$name,"symlink"=>$linked]);' >> upload/deployer.php
 
       - name: Debug - local files
@@ -233,11 +250,11 @@ jobs:
         run: |
           set -e
           if [ -z "${{ secrets.SITE_BASE_URL }}" ]; then
-            echo "::error::Missing secret SITE_BASE_URL (ex.: https://cdn.omixfy.com)"
+            echo "::error::Missing secret SITE_BASE_URL (ex.: https://cdn.assetsme.com)"
             exit 1
           fi
           if ! echo "${{ secrets.SITE_BASE_URL }}" | grep -Eqi '^https?://'; then
-            echo "::error::SITE_BASE_URL must start with http:// or https:// (ex.: https://cdn.omixfy.com)"
+            echo "::error::SITE_BASE_URL must start with http:// or https:// (ex.: https://cdn.assetsme.com)"
             exit 1
           fi
           BASE="${{ secrets.SITE_BASE_URL }}"; BASE="${BASE%/}"
