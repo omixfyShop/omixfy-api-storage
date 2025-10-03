@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Setting;
 use App\Models\User;
 use Closure;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -17,7 +18,7 @@ class EnsureRegistrationOpen
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next): RedirectResponse|Response
+    public function handle(Request $request, Closure $next): RedirectResponse|Response|JsonResponse
     {
         if (User::query()->count() > 0) {
             $settings = Setting::get('registration_enabled', ['on' => false]);

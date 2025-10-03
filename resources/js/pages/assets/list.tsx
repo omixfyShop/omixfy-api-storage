@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Asset, PaginationMeta } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
-const TOKEN = import.meta.env.VITE_ASSETSME_TOKEN ?? '';
+
 
 const breadcrumbs = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -73,7 +73,7 @@ export default function List() {
     const [page, setPage] = useState<number>(1);
     const [appliedFolder, setAppliedFolder] = useState<string>('');
     const [meta, setMeta] = useState<PaginationMeta>({ current_page: 1, per_page: 25, next_page_url: null, prev_page_url: null });
-
+    const TOKEN = localStorage.getItem('tokenAssetsme') ?? '';
     const hasToken = TOKEN && TOKEN !== '';
     const perPage = 25;
 

@@ -5,7 +5,6 @@ import { useCallback, useRef, useState } from 'react';
 import type { AssetUploadResult, UploadStatus } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
-const TOKEN = import.meta.env.VITE_ASSETSME_TOKEN ?? '';
 
 const breadcrumbs = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -74,6 +73,7 @@ export default function Upload() {
     const [error, setError] = useState<string>('');
     const [results, setResults] = useState<AssetUploadResult[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const TOKEN = localStorage.getItem('tokenAssetsme') ?? '';
 
     const hasToken = TOKEN && TOKEN !== '';
 
