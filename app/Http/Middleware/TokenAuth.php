@@ -61,7 +61,7 @@ class TokenAuth
     private function unauthorized(): JsonResponse
     {
         return new JsonResponse([
-            'message' => 'Unauthorized',
+            'message' => 'Você não está autorizado a acessar este recurso.',
         ], Response::HTTP_UNAUTHORIZED);
     }
 }
