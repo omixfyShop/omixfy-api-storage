@@ -11,51 +11,111 @@ AssetsMe é um gerenciador de arquivos estáticos construído com Laravel 11, In
 - Extensão PHP `fileinfo`
 - SQLite (padrão) ou outro banco compatível configurado no `.env`
 
-## Configuração do projeto
+## Instalação
 
-1. Instale as dependências PHP e JavaScript:
+1. Clone o repositório e acesse a pasta do projeto:
+
+   ```bash
+   git clone https://github.com/sua-organizacao/assetsme.git
+   cd assetsme
+   ```
+
+2. Instale as dependências PHP e JavaScript:
 
    ```bash
    composer install
    npm install
    ```
 
-2. Copie o arquivo de ambiente e gere a chave da aplicação:
+## Configuração inicial
+
+1. Copie o arquivo de ambiente e gere a chave da aplicação:
 
    ```bash
    cp .env.example .env
    php artisan key:generate
    ```
 
-3. Ajuste os valores a seguir no `.env`:
+2. Ajuste os valores a seguir no `.env` (consulte os comentários em `.env.example` para mais detalhes):
 
    - `ASSETS_DISK`: disco Laravel utilizado para armazenar os arquivos (padrão `assets`).
    - `ASSETS_BASE_URL`: URL pública base para servir os arquivos em `public/assets`.
    - `ASSETS_MAX_FILE_SIZE`: limite de upload em bytes (padrão 10 MB).
-   - `VITE_API_BASE_URL`: endereço base para o cliente React alcançar a API (ex.: `http://localhost`).
+   - `VITE_API_URL`: endereço base para o cliente React alcançar a API (ex.: `http://localhost:8000`).
    - `VITE_ASSETSME_TOKEN`: token utilizado pelo painel para enviar requisições à API (defina com um token gerado no menu **Tokens** do painel).
    - `REGISTRATION_DEV_ALWAYS_OPEN` (opcional): defina como `true` para manter o formulário de cadastro público liberado em ambientes de desenvolvimento.
 
-4. Execute as migrações do banco:
+3. Execute as migrações do banco:
 
    ```bash
    php artisan migrate
    ```
 
-5. Garanta que a pasta pública de assets exista (já criada por padrão) e mantenha o `.htaccess` versionado para cache agressivo e bloqueio de execução PHP:
+4. Garanta que a pasta pública de assets exista (já criada por padrão) e mantenha o `.htaccess` versionado para cache agressivo e bloqueio de execução PHP:
 
    ```bash
    mkdir -p public/assets
    ```
 
-6. Suba os servidores de desenvolvimento em terminais separados:
+## Executando em desenvolvimento
+
+1. Inicie o servidor Laravel em um terminal:
 
    ```bash
    php artisan serve
+   ```
+
+2. Em outro terminal, execute o Vite para o front-end React:
+
+   ```bash
    npm run dev
    ```
 
 A aplicação estará disponível em `http://localhost:8000` com assets acessíveis diretamente via `http://localhost:8000/assets/...`.
+
+Se preferir executar tudo em um único terminal, utilize o pacote `concurrently` já instalado:
+
+```bash
+npm install -g concurrently # opcional caso deseje rodar globalmente
+concurrently "php artisan serve" "npm run dev"
+```
+
+## Build e execução em produção
+
+1. Gere os assets otimizados:
+
+   ```bash
+   npm run build
+   ```
+
+2. Execute as migrações com flag `--force` e configure o servidor web de sua preferência apontando para `public/`:
+
+   ```bash
+   php artisan migrate --force
+   php artisan config:cache
+   php artisan route:cache
+   php artisan view:cache
+   ```
+
+3. Certifique-se de configurar o cron/queue se necessário e mantenha a pasta `public/assets` acessível para o servidor HTTP.
+
+## Testes
+
+- Testes de unidade/feature PHP:
+
+  ```bash
+  php artisan test
+  # ou
+  ./vendor/bin/phpunit
+  ```
+
+- Verificação do front-end:
+
+  ```bash
+  npm run lint
+  npm run types
+  npm run build
+  ```
 
 ## Tokens fixos
 
