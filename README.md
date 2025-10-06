@@ -2,6 +2,9 @@
 
 AssetsMe é um gerenciador de arquivos estáticos construído com Laravel 11, Inertia e React. Ele oferece uma API autenticada via token fixo para upload, listagem e remoção de assets, além de um painel administrativo para operadores autenticados.
 
+
+Roadmap: https://assetsme.featurebase.app/en/roadmap
+
 ## Requisitos
 
 - PHP 8.2+
