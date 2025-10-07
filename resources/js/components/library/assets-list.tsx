@@ -38,7 +38,7 @@ function ImagePreview({ asset }: { asset: LibraryAsset }) {
         <img
             src={`${assetsBase}${asset.path}`}
             alt={asset.path.split('/').pop()}
-            className="h-[200px] w-[200px] rounded-lg object-cover"
+            className="h-[200px] w-full rounded-lg object-contain mx-auto"
             onError={() => setImageError(true)}
         />
     );
