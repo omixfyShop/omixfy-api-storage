@@ -71,7 +71,9 @@ export function AssetsList({ assets }: AssetsListProps) {
                                 ) : (
                                     <Paperclip className="h-4 w-4" />
                                 )}
-                                <span>{asset.path}</span>
+                                <a href={`${assetsBase}${asset.path}`} target="_blank" rel="noreferrer">
+                                    <span>{asset.path}</span>
+                                </a>
                             </div>
                             <span>{formatBytes(asset.size_bytes)}</span>
                         </CardContent>
