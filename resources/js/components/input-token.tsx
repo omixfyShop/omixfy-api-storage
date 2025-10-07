@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input';
 
 export function InputToken() {
     const [token, setToken] = useState<string>('');
-    const [isVisible, setIsVisible] = useState<boolean>(false);
 
     // Carregar token do localStorage quando o componente monta
     useEffect(() => {
@@ -24,12 +23,6 @@ export function InputToken() {
         }
     };
 
-    // Remover token do localStorage
-    const handleClearToken = () => {
-        localStorage.removeItem('tokenAssetsme');
-        setToken('');
-        alert('Token removido com sucesso!');
-    };
 
     return (
         <div className="space-y-3 border-t">

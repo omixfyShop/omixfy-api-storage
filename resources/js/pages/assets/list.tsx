@@ -85,7 +85,7 @@ export default function List() {
                 setLoading(false);
             }
         },
-        [appliedFolder, hasToken, page, perPage],
+        [appliedFolder, hasToken, page, perPage, TOKEN],
     );
 
     useEffect(() => {
@@ -149,7 +149,7 @@ export default function List() {
                 setError('Erro de rede ao remover o arquivo.');
             }
         },
-        [],
+        [TOKEN],
     );
 
     const resetFilters = useCallback(() => {
