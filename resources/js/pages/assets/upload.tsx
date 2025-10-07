@@ -3,8 +3,7 @@ import { Head } from '@inertiajs/react';
 import { CloudUpload, Copy, FolderInput, Loader2, X } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import type { AssetUploadResult, UploadStatus } from '@/types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+import { buildEndpoint, extractErrorMessage } from '@/api';
 
 const breadcrumbs = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -24,44 +23,6 @@ function formatBytes(bytes: number | undefined | null): string {
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     const value = bytes / Math.pow(1024, i);
     return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${sizes[i]}`;
-}
-
-function buildEndpoint(path: string, params: Record<string, string | number | undefined | null> = {}): string {
-    const base = API_BASE_URL || window.location.origin;
-    const url = new URL(path, base.endsWith('/') ? base : `${base}/`);
-
-    Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-            url.searchParams.set(key, String(value));
-        }
-    });
-
-    return url.toString();
-}
-
-function extractErrorMessage(payload: unknown, fallback: string): string {
-    if (!payload || typeof payload !== 'object') {
-        return fallback;
-    }
-
-    const obj = payload as Record<string, unknown>;
-
-    if (typeof obj.message === 'string' && obj.message.trim() !== '') {
-        return obj.message;
-    }
-
-    if (obj.errors && typeof obj.errors === 'object') {
-        const errors = obj.errors as Record<string, unknown>;
-        const [firstKey] = Object.keys(errors);
-        if (firstKey) {
-            const messages = errors[firstKey];
-            if (Array.isArray(messages) && messages.length > 0) {
-                return String(messages[0]);
-            }
-        }
-    }
-
-    return fallback;
 }
 
 export default function Upload() {
@@ -217,7 +178,7 @@ export default function Upload() {
 
                     {!hasToken && (
                         <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                            Configure <code>VITE_ASSETSME_TOKEN</code> no arquivo <code>.env</code> do frontend para enviar requisições autenticadas.
+                           Adicione um token no menu lateral para enviar requisições autenticadas.
                         </div>
                     )}
 
