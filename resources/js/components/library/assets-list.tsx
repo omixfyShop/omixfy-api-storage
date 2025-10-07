@@ -5,7 +5,7 @@ import { Image, Paperclip } from 'lucide-react';
 import { useState } from 'react';
 
 const root = (import.meta.env.VITE_API_URL as string | undefined) ?? window.location.origin;
-const assetsBase = `${root}/assets`;
+const assetsBase = `${root}/assets/`;
 
 interface AssetsListProps {
     assets: LibraryAsset[];
