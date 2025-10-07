@@ -192,9 +192,9 @@ Configure em **Settings → Secrets and variables → Actions → New repository
 | `FTP_SERVER` | Endereço do servidor FTP/FTPS | `ftp.seudominio.com` |
 | `FTP_USERNAME` | Usuário com permissão de escrita | `usuario@seudominio.com` |
 | `FTP_PASSWORD` | Senha do usuário FTP | `sua-senha-segura` |
-| `FTP_SERVER_DIR` | Diretório remoto de destino | `/public_html` ou `/www` |
 | `FTP_PORT` | Porta FTPS (opcional) | `21` (padrão) |
 | `DEPLOY_HOOK_TOKEN` | Token para webhook de deploy (GERE UM TOKEN ALEATÓRIO) | Token personalizado |
+| `SITE_BASE_URL` | URL pública do site | `https://seu-dominio.com` |
 
 ### Checklist da primeira publicação
 
