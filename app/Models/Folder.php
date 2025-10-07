@@ -4,9 +4,7 @@ namespace App\Models;
 
 use App\Jobs\GenerateFolderPreview;
 use App\Jobs\UpdateFolderCounters;
-use Illuminate\Database\Eloquent\Attributes\Attribute;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,7 +29,6 @@ use Illuminate\Support\Str;
 class Folder extends Model
 {
     use HasFactory;
-    use HasUuids;
     use SoftDeletes;
 
     protected $fillable = [
@@ -151,26 +148,22 @@ class Folder extends Model
     /**
      * Breadcrumb accessor returning an ordered collection of ancestors.
      */
-    protected function breadcrumbs(): Attribute
+    public function getBreadcrumbsAttribute(): Collection
     {
-        return Attribute::make(
-            get: function (): Collection {
-                $breadcrumbs = collect();
-                $current = $this;
+        $breadcrumbs = collect();
+        $current = $this;
 
-                while ($current) {
-                    $breadcrumbs->prepend([
-                        'id' => $current->id,
-                        'uuid' => $current->uuid,
-                        'name' => $current->name,
-                        'slug' => $current->slug,
-                    ]);
-                    $current = $current->parent;
-                }
+        while ($current) {
+            $breadcrumbs->prepend([
+                'id' => $current->id,
+                'uuid' => $current->uuid,
+                'name' => $current->name,
+                'slug' => $current->slug,
+            ]);
+            $current = $current->parent;
+        }
 
-                return $breadcrumbs->values();
-            },
-        );
+        return $breadcrumbs->values();
     }
 
     public function refreshPreview(): void

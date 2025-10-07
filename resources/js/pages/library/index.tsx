@@ -136,9 +136,9 @@ export default function LibraryIndex() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={pageTitle} />
-
+            <div className="flex flex-col gap-6 p-6">
             <LibraryLayout
-                breadcrumbs={breadcrumbs}
+                breadcrumbs={[]}
                 title={pageTitle}
                 onCreateFolder={() => setCreateOpen(true)}
                 search={search}
@@ -197,6 +197,7 @@ export default function LibraryIndex() {
                     </div>
                 ) : null}
             </LibraryLayout>
+            </div>
 
             <CreateFolderDialog open={createOpen} onOpenChange={setCreateOpen} parentId={currentFolderId} />
         </AppLayout>

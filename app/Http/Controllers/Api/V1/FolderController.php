@@ -20,9 +20,20 @@ use Illuminate\Support\Facades\Log;
 
 class FolderController extends Controller
 {
+    /**
+     * Get the authenticated user ID from request or token.
+     */
+    private function getUserId(Request $request): ?int
+    {
+        return $request->user()?->id ?? $request->attributes->get('token_user_id');
+    }
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $userId = $this->getUserId($request);
+
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
 
         $perPage = min((int) $request->integer('per_page', 30), 100);
         $orderBy = $request->get('orderBy', 'name');
@@ -37,7 +48,7 @@ class FolderController extends Controller
         $hasSearch = $request->filled('q');
 
         $query = Folder::query()
-            ->ownedBy($user->id)
+            ->ownedBy($userId)
             ->when($hasParent, fn (Builder $builder) => $builder->where('parent_id', $request->integer('parent_id')))
             ->when(!$hasParent && !$hasSearch, fn (Builder $builder) => $builder->whereNull('parent_id'))
             ->when($hasSearch, fn (Builder $builder) => $builder->where('name', 'like', '%'.$request->get('q').'%'))
@@ -50,14 +61,19 @@ class FolderController extends Controller
 
     public function store(StoreFolderRequest $request): JsonResponse
     {
-        $user = $request->user();
+        $userId = $this->getUserId($request);
+        
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        
         $this->authorize('create', Folder::class);
 
         $parentId = $request->integer('parent_id');
         $parent = null;
 
         if ($parentId) {
-            $parent = Folder::ownedBy($user->id)->findOrFail($parentId);
+            $parent = Folder::ownedBy($userId)->findOrFail($parentId);
         }
 
         $name = trim($request->input('name'));
@@ -65,12 +81,12 @@ class FolderController extends Controller
         $folder = Folder::create([
             'name' => $name,
             'parent_id' => $parent?->id,
-            'owner_id' => $user->id,
+            'owner_id' => $userId,
             'access_level' => 'private',
         ]);
 
         Log::info('library:folder-create', [
-            'user_id' => $user->id,
+            'user_id' => $userId,
             'folder_id' => $folder->id,
             'depth' => $folder->depth,
         ]);
@@ -84,7 +100,7 @@ class FolderController extends Controller
         $folder->load('parent');
 
         Log::info('library:view', [
-            'user_id' => $request->user()->id,
+            'user_id' => $this->getUserId($request),
             'folder_id' => $folder->id,
             'depth' => $folder->depth,
             'count_items' => $folder->files_count + $folder->folders_count,
@@ -105,7 +121,7 @@ class FolderController extends Controller
         ]);
 
         Log::info('library:folder-rename', [
-            'user_id' => $request->user()->id,
+            'user_id' => $this->getUserId($request),
             'folder_id' => $folder->id,
         ]);
 
@@ -132,7 +148,7 @@ class FolderController extends Controller
         GenerateFolderPreview::dispatch($folder->id);
 
         Log::info('library:folder-move', [
-            'user_id' => $request->user()->id,
+            'user_id' => $this->getUserId($request),
             'folder_id' => $folder->id,
             'parent_id' => $targetParentId,
         ]);
@@ -147,7 +163,7 @@ class FolderController extends Controller
         UpdateFolderCounters::dispatch($folder->parent_id);
 
         Log::info('library:folder-delete', [
-            'user_id' => $request->user()->id,
+            'user_id' => $this->getUserId($request),
             'folder_id' => $folder->id,
         ]);
 
@@ -166,7 +182,7 @@ class FolderController extends Controller
         GenerateFolderPreview::dispatch($folder->id);
 
         Log::info('library:folder-restore', [
-            'user_id' => $request->user()->id,
+            'user_id' => $this->getUserId($request),
             'folder_id' => $folder->id,
         ]);
 
@@ -176,7 +192,7 @@ class FolderController extends Controller
     public function children(Request $request, Folder $folder): JsonResponse
     {
         $this->authorize('view', $folder);
-        $user = $request->user();
+        $userId = $this->getUserId($request);
 
         $perPage = min((int) $request->integer('per_page', 30), 100);
         $orderBy = $request->get('orderBy', 'name');
@@ -188,14 +204,14 @@ class FolderController extends Controller
         }
 
         $folders = Folder::query()
-            ->ownedBy($user->id)
+            ->ownedBy($userId)
             ->where('parent_id', $folder->id)
             ->orderBy($orderBy, $order)
             ->paginate($perPage, ['*'], 'folders_page');
 
         $assets = Asset::query()
             ->where('folder_id', $folder->id)
-            ->where('owner_id', $user->id)
+            ->where('owner_id', $userId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage, ['*'], 'assets_page');
 
@@ -235,7 +251,7 @@ class FolderController extends Controller
         ]);
 
         Log::info('library:folder-token-create', [
-            'user_id' => $request->user()->id,
+            'user_id' => $this->getUserId($request),
             'folder_id' => $folder->id,
             'token_id' => $token->id,
         ]);
