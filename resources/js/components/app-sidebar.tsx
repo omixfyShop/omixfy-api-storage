@@ -2,6 +2,7 @@ import { InputToken } from '@/components/input-token';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { Book } from 'lucide-react';
 import {
     Sidebar,
     SidebarContent,
@@ -34,10 +35,16 @@ const baseNavItems: NavItem[] = [
         icon: List,
     },
     {
+        title: 'Biblioteca',
+        href: '/library',
+        icon: Book,
+    },
+    {
         title: 'Tokens',
         href: '/tokens',
         icon: KeyRound,
     },
+
 ];
 
 const footerNavItems: NavItem[] = [

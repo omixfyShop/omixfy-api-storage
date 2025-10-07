@@ -46,8 +46,10 @@ Apos clonar o repositório.
    - `ASSETS_BASE_URL`: URL pública base para servir os arquivos em `public/assets`.
    - `ASSETS_MAX_FILE_SIZE`: limite de upload em bytes (padrão 10 MB).
    - `VITE_API_URL`: endereço base para o cliente React alcançar a API (ex.: `http://localhost:8000`).
-   - `VITE_ASSETSME_TOKEN`: token utilizado pelo painel para enviar requisições à API (defina com um token gerado no menu **Tokens** do painel).
-   - `REGISTRATION_DEV_ALWAYS_OPEN` (opcional): defina como `true` para manter o formulário de cadastro público liberado em ambientes de desenvolvimento.
+    - `VITE_ASSETSME_TOKEN`: token utilizado pelo painel para enviar requisições à API (defina com um token gerado no menu **Tokens** do painel).
+    - `REGISTRATION_DEV_ALWAYS_OPEN` (opcional): defina como `true` para manter o formulário de cadastro público liberado em ambientes de desenvolvimento.
+   - `IMAGE_THUMB_SIZE` (opcional): tamanho em pixels para geração dos thumbs WebP das pastas (padrão `512`).
+   - `IMAGE_QUALITY` (opcional): qualidade (0-100) utilizada na compressão WebP das prévias (padrão `80`).
 
 3. Execute as migrações do banco:
 
@@ -163,6 +165,12 @@ O Vite carregará automaticamente as variáveis do arquivo `.env.develop` quando
   npm run types
   npm run build
   ```
+
+## Biblioteca de Pastas
+
+- Execute `php artisan migrate` para criar as tabelas `folders` e `folder_tokens` e ajustar a estrutura de `assets`.
+- A navegação hierárquica fica disponível em `/library` no painel e exposta via API REST em `/api/v1/folders`.
+- Pré-visualizações de pastas utilizam miniaturas WebP (`IMAGE_THUMB_SIZE`/`IMAGE_QUALITY`). Ajuste as variáveis se precisar de resoluções diferentes.
 
 ## Tokens fixos
 

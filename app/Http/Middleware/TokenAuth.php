@@ -3,9 +3,11 @@
 namespace App\Http\Middleware;
 
 use App\Models\AccessToken;
+use App\Models\User;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class TokenAuth
@@ -30,6 +32,12 @@ class TokenAuth
         }
 
         $request->attributes->set('token_user_id', $accessToken->user_id);
+
+        // Definir o usuário autenticado para o Laravel
+        $user = User::find($accessToken->user_id);
+        if ($user) {
+            Auth::setUser($user);
+        }
 
         $response = $next($request);
 

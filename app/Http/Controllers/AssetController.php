@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\Folder;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\JsonResponse;
@@ -51,6 +52,15 @@ class AssetController extends Controller
         $validated = $validator->validated();
         $folder = $this->normalizeFolder($validated['folder'] ?? null);
 
+        // Get user ID for folder resolution
+        $userId = $request->user()?->id ?? $request->attributes->get('token_user_id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Resolve folder ID from folder path
+        $folderId = $this->resolveFolderId($folder, $userId);
+
         $uploadedFiles = $request->file('files', []);
         if (! is_array($uploadedFiles)) {
             $uploadedFiles = [$uploadedFiles];
@@ -66,8 +76,6 @@ class AssetController extends Controller
         $results = [];
 
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
-
-        $tokenUserId = $request->attributes->get('token_user_id');
 
         foreach ($uploadedFiles as $file) {
             if (! $file->isValid()) {
@@ -111,18 +119,21 @@ class AssetController extends Controller
 
             $asset = Asset::create([
                 'path' => $relativePath,
+                'folder_id' => $folderId,
                 'folder' => $folder,
+                'owner_id' => $userId,
                 'original_name' => $originalName,
                 'mime' => $detectedMime,
                 'size' => $file->getSize(),
                 'checksum' => hash_file('sha256', $file->getRealPath()),
-                'uploaded_by' => $request->user()?->id ?? $tokenUserId,
+                'uploaded_by' => $userId,
             ]);
 
             $results[] = [
                 'id' => $asset->id,
                 'url' => $disk->url($relativePath),
                 'path' => $asset->path,
+                'folder_id' => $asset->folder_id,
                 'folder' => $asset->folder,
                 'mime' => $asset->mime,
                 'size' => $asset->size,
@@ -333,5 +344,54 @@ class AssetController extends Controller
     private function disk(): FilesystemAdapter
     {
         return Storage::disk(config('assetsme.disk', 'assets'));
+    }
+
+    /**
+     * Resolve folder ID from folder path string.
+     * Creates folders if they don't exist.
+     */
+    private function resolveFolderId(?string $folderPath, int $userId): ?int
+    {
+        if (!$folderPath || trim($folderPath) === '') {
+            return null;
+        }
+
+        $folderPath = trim($folderPath, '/');
+        if ($folderPath === '') {
+            return null;
+        }
+
+        // Split the path into parts
+        $pathParts = explode('/', $folderPath);
+        $currentParentId = null;
+        $currentFolder = null;
+
+        foreach ($pathParts as $folderName) {
+            if (trim($folderName) === '') {
+                continue;
+            }
+
+            // Look for existing folder
+            $existingFolder = Folder::where('name', $folderName)
+                ->where('parent_id', $currentParentId)
+                ->where('owner_id', $userId)
+                ->first();
+
+            if ($existingFolder) {
+                $currentFolder = $existingFolder;
+                $currentParentId = $existingFolder->id;
+            } else {
+                // Create new folder
+                $currentFolder = Folder::create([
+                    'name' => $folderName,
+                    'parent_id' => $currentParentId,
+                    'owner_id' => $userId,
+                    'access_level' => 'private',
+                ]);
+                $currentParentId = $currentFolder->id;
+            }
+        }
+
+        return $currentFolder?->id;
     }
 }

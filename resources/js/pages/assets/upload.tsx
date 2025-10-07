@@ -144,7 +144,7 @@ export default function Upload() {
 
             xhr.send(formData);
         });
-    }, [files, folder, hasToken]);
+    }, [files, folder, hasToken, TOKEN]);
 
     const removeFile = useCallback((file: File) => {
         setFiles((current) => current.filter((item) => item !== file));

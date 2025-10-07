@@ -83,3 +83,86 @@ export interface AccessTokenItem {
     created_at: string;
     last_used_at: string | null;
 }
+
+export type FolderAccessLevel = 'private' | 'token' | 'public';
+
+export interface LibraryFolderBreadcrumb {
+    id: number;
+    uuid?: string;
+    name: string;
+    slug: string;
+}
+
+export interface LibraryFolder {
+    id: number;
+    uuid: string;
+    name: string;
+    slug: string;
+    parent_id: number | null;
+    owner_id: number;
+    access_level: FolderAccessLevel;
+    depth: number;
+    files_count: number;
+    folders_count: number;
+    preview_asset_ids: number[];
+    breadcrumbs: LibraryFolderBreadcrumb[];
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface LibraryAssetPreviewMeta {
+    path: string;
+    width: number;
+    height: number;
+    quality: number;
+    format: string;
+}
+
+export interface LibraryAsset {
+    id: number;
+    path: string;
+    folder_id: number | null;
+    owner_id: number;
+    mime: string;
+    width: number | null;
+    height: number | null;
+    size_bytes: number | null;
+    generated_thumbs: Record<string, unknown> | null;
+    preview_thumb?: LibraryAssetPreviewMeta | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PaginatedLinks {
+    first?: string | null;
+    last?: string | null;
+    prev?: string | null;
+    next?: string | null;
+}
+
+export interface PaginatedMetaLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
+export interface PaginatedResponse<T> {
+    data: T[];
+    links?: PaginatedLinks;
+    meta: {
+        current_page: number;
+        from?: number | null;
+        last_page?: number;
+        path?: string;
+        per_page: number;
+        to?: number | null;
+        total?: number;
+        links?: PaginatedMetaLink[];
+    };
+}
+
+export interface FolderChildrenResponse {
+    folders: PaginatedResponse<LibraryFolder>;
+    assets: PaginatedResponse<LibraryAsset>;
+}

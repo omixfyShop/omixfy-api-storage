@@ -22,6 +22,11 @@ export async function request<T>(url: string, options: RequestInit = {}): Promis
     if (body && !(body instanceof FormData) && !headers.has('Content-Type')) {
         headers.set('Content-Type', 'application/json');
     }
+    
+    const token = localStorage.getItem('tokenAssetsme') ?? '';
+    if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+    }
 
     if (options.method && options.method.toUpperCase() !== 'GET') {
         const token = getCsrfToken();

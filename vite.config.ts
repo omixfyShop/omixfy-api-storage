@@ -20,4 +20,9 @@ export default defineConfig({
     esbuild: {
         jsx: 'automatic',
     },
+    test: {
+        environment: 'jsdom',
+        globals: true,
+        setupFiles: ['resources/js/tests/setup.ts'],
+    },
 });
