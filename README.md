@@ -2,8 +2,10 @@
 
 AssetsMe é um gerenciador de arquivos estáticos construído com Laravel 11, Inertia e React. Ele oferece uma API autenticada via token fixo para upload, listagem e remoção de assets, além de um painel administrativo para operadores autenticados.
 
+> 🚀 **Deploy e Produção:** Veja [README_PRODUCTION.md](README_PRODUCTION.md) para informações sobre build, deploy e configuração em produção.
 
-Roadmap: https://assetsme.featurebase.app/en/roadmap
+**Roadmap:** https://assetsme.featurebase.app/en/roadmap
+
 
 ## Requisitos
 
@@ -15,15 +17,9 @@ Roadmap: https://assetsme.featurebase.app/en/roadmap
 - SQLite (padrão) ou outro banco compatível configurado no `.env`
 
 ## Instalação
+Apos clonar o repositório.
 
-1. Clone o repositório e acesse a pasta do projeto:
-
-   ```bash
-   git clone https://github.com/sua-organizacao/assetsme.git
-   cd assetsme
-   ```
-
-2. Instale as dependências PHP e JavaScript:
+1. Instale as dependências PHP e JavaScript:
 
    ```bash
    composer install
@@ -35,9 +31,14 @@ Roadmap: https://assetsme.featurebase.app/en/roadmap
 1. Copie o arquivo de ambiente e gere a chave da aplicação:
 
    ```bash
-   cp .env.example .env
+   cp .env.example .env.develop
    php artisan key:generate
    ```
+
+   **Nota sobre ambientes:** O projeto suporta múltiplos arquivos de ambiente:
+   - `.env` - ambiente padrão
+   - `.env.develop` - ambiente de desenvolvimento alternativo (opcional)
+   - `.env.example` - template com todas as variáveis disponíveis (versionado no git)
 
 2. Ajuste os valores a seguir no `.env` (consulte os comentários em `.env.example` para mais detalhes):
 
@@ -64,6 +65,8 @@ Roadmap: https://assetsme.featurebase.app/en/roadmap
 
 ## Executando em desenvolvimento
 
+### Usando o ambiente padrão (.env)
+
 1. Inicie o servidor Laravel em um terminal:
 
    ```bash
@@ -78,31 +81,72 @@ Roadmap: https://assetsme.featurebase.app/en/roadmap
 
 A aplicação estará disponível em `http://localhost:8000` com assets acessíveis diretamente via `http://localhost:8000/assets/...`.
 
-Se preferir executar tudo em um único terminal, utilize o pacote `concurrently` já instalado:
+Se preferir executar tudo em um único terminal, utilize o script `serve`:
 
 ```bash
-npm install -g concurrently # opcional caso deseje rodar globalmente
-concurrently "php artisan serve" "npm run dev"
+npm run serve
 ```
 
-## Build e execução em produção
+### Usando ambiente de desenvolvimento alternativo (.env.develop)
 
-1. Gere os assets otimizados:
+Para rodar a aplicação usando configurações específicas de desenvolvimento, você pode usar o arquivo `.env.develop`:
 
-   ```bash
-   npm run build
-   ```
-
-2. Execute as migrações com flag `--force` e configure o servidor web de sua preferência apontando para `public/`:
+1. Configure o arquivo `.env.develop` com suas variáveis de ambiente de desenvolvimento:
 
    ```bash
-   php artisan migrate --force
-   php artisan config:cache
-   php artisan route:cache
-   php artisan view:cache
+   cp .env.example .env.develop
+   # Edite .env.develop com suas configurações de desenvolvimento
    ```
 
-3. Certifique-se de configurar o cron/queue se necessário e mantenha a pasta `public/assets` acessível para o servidor HTTP.
+   **Exemplo de configurações úteis no `.env.develop`:**
+   ```env
+   APP_ENV=develop
+   APP_DEBUG=true
+   APP_URL=http://localhost:8000
+   
+   # Use um banco de dados diferente para desenvolvimento
+   DB_CONNECTION=sqlite
+   DB_DATABASE=database/database-develop.sqlite
+   
+   # URLs e tokens específicos de desenvolvimento
+   VITE_API_URL=http://localhost:8000
+   VITE_ASSETSME_TOKEN=seu-token-de-desenvolvimento
+   
+   # Manter cadastro sempre aberto em desenvolvimento
+   REGISTRATION_DEV_ALWAYS_OPEN=true
+   ```
+
+2. Gere a chave da aplicação para o ambiente develop (se necessário):
+
+   ```bash
+   php artisan key:generate --env=develop
+   ```
+
+3. Execute as migrações para o banco de dados de desenvolvimento:
+
+   ```bash
+   php artisan migrate --env=develop
+   ```
+
+4. Execute ambos os servidores (Laravel e Vite) usando o ambiente develop:
+
+   ```bash
+   npm run serve:develop
+   ```
+
+   Ou execute os comandos separadamente:
+
+   **Terminal 1 (Laravel):**
+   ```bash
+   php artisan serve --env=develop
+   ```
+
+   **Terminal 2 (Vite):**
+   ```bash
+   npm run dev:develop
+   ```
+
+O Vite carregará automaticamente as variáveis do arquivo `.env.develop` quando executado com `--mode develop`, enquanto o Laravel usará o `.env.develop` quando a flag `--env=develop` for passada.
 
 ## Testes
 
@@ -140,20 +184,6 @@ qualquer momento.
 3. O token gerado será exibido apenas uma vez em um modal. Copie-o imediatamente e armazene com segurança.
 4. Utilize a coluna "Prévia" para identificar tokens existentes e remova-os quando não forem mais necessários.
 
-### Criando tokens via CLI
-
-```
-php artisan assetsme:token {user} {--name=}
-```
-
-- `{user}` aceita o ID numérico ou o e-mail do usuário.
-- `--name=` define um rótulo opcional para facilitar a identificação do token.
-
-Exemplo:
-
-```
-php artisan assetsme:token admin@example.com --name="Integração CI"
-```
 
 ### Utilizando tokens na API
 
@@ -226,50 +256,32 @@ O painel utiliza autenticação padrão do Laravel Breeze. Após realizar login:
 - **Tokens** (`/tokens`): listagem dos tokens vinculados ao usuário, criação de novos tokens (exibidos uma única vez) e exclusão segura.
 - **Usuários** (`/admin/users`): disponível apenas para o usuário master. Permite habilitar/desabilitar o cadastro público, criar usuários manualmente (com geração opcional de senha) e visualizar quem é o master.
 
-O primeiro usuário criado na plataforma é marcado automaticamente como **master**. Após esse cadastro inicial, o registro público é desabilitado até que o master o reative manualmente. Você pode reabrir ou encerrar o cadastro a qualquer momento pelo painel em **Usuários → Habilitar cadastro** ou persistindo o valor em `settings.registration_enabled` via seeders/migrations.
-
-As chamadas ao backend são feitas via `fetch` utilizando `Authorization: Bearer ${import.meta.env.VITE_ASSETSME_TOKEN}`. Configure esta variável com um token criado no menu **Tokens**; ele não é exibido na interface.
-
-## Segurança e cache
-
-- Middleware `token` garante autenticação por token fixo em todas as rotas da API.
-- Sanitização de nomes de pastas e arquivos com bloqueio de `..`.
-- Verificação de MIME real com `finfo` e bloqueio de conteúdo PHP.
-- `public/assets/.htaccess` aplica `Options -Indexes`, bloqueio de execução PHP e cache forte (`Cache-Control: public, max-age=31536000, immutable`).
-- URLs públicas são servidas diretamente em `/assets/...` sem expor detalhes de implementação Laravel.
-
-## Deploy
-
-- Configure o `DocumentRoot` do servidor para apontar para a pasta `public/` do projeto.
-- Certifique-se de publicar o `.htaccess` de `public/assets`.
-- Ajuste `APP_URL`, `ASSETS_BASE_URL` e tokens nas variáveis de ambiente do servidor.
-- Para ambientes compartilhados (Apache), mantenha as regras de cache e bloqueio de execução PHP para evitar upload de scripts maliciosos.
-
-## Deploy via FTPS (GitHub Actions)
-
-O repositório possui um workflow (`.github/workflows/deploy-ftp.yml`) que constrói a aplicação (Composer + Vite) e publica os artefatos via FTPS utilizando a ação `SamKirkland/FTP-Deploy-Action`. O deploy é incremental e preserva o `.env` remoto.
-
-### Secrets necessários
-
-Configure em **Actions → Secrets and variables → Actions**:
-
-- `FTP_SERVER`: endereço do servidor (ex.: `ftp.seudominio.com`).
-- `FTP_USERNAME`: usuário com permissão de escrita no `public_html`.
-- `FTP_PASSWORD`: senha do usuário FTP.
-- `FTP_SERVER_DIR`: diretório remoto de destino (ex.: `/public_html`).
-- `FTP_PORT` (opcional): porta FTPS, padrão `21`.
-
-### Checklist da primeira publicação
-
-- [ ] Criar manualmente `public_html/assetsme/.env` no servidor com `APP_KEY` e demais configurações reais.
-- [ ] Garantir permissões de escrita para o processo web em `public_html/assetsme/storage/` e `public_html/assetsme/bootstrap/cache/`.
-- [ ] Confirmar que existe um `index.php` de ponte em `public_html/` apontando para `assetsme/public/index.php` (gerado pelo workflow).
-- [ ] Fazer `git push origin main` para disparar o workflow de deploy.
-- [ ] Executar migrações manualmente via SSH ou hPanel sempre que necessário (FTPS não executa comandos).
-
-O workflow compila as dependências PHP (sem `--dev`), gera os assets com Vite, envia o conteúdo preparado em `deploy/` para `${FTP_SERVER_DIR}` e nunca sincroniza o `.env` local, mantendo o arquivo remoto intacto.
 
 ## Comandos úteis
+
+### Desenvolvimento
+
+```bash
+# Executar servidor Laravel + Vite (ambiente padrão)
+npm run serve
+
+# Executar servidor Laravel + Vite (ambiente develop)
+npm run serve:develop
+
+# Apenas servidor Laravel (ambiente padrão)
+php artisan serve
+
+# Apenas servidor Laravel (ambiente develop)
+php artisan serve --env=develop
+
+# Apenas Vite (ambiente padrão)
+npm run dev
+
+# Apenas Vite (ambiente develop)
+npm run dev:develop
+```
+
+### Testes e qualidade de código
 
 ```bash
 # Executa a suíte de testes PHP
@@ -277,22 +289,33 @@ php artisan test
 
 # Checa tipos do front-end
 npm run types
+
+# Executa linter no código TypeScript/React
+npm run lint
+
+# Formata código
+npm run format
+
+# Verifica formatação sem alterar
+npm run format:check
 ```
 
-## Estrutura de dados
 
-Tabela `assets`:
 
-| Campo         | Tipo     | Descrição                                         |
-|---------------|----------|---------------------------------------------------|
-| id            | UUID     | Identificador único                               |
-| path          | string   | Caminho relativo dentro de `public/assets`        |
-| folder        | string   | Pasta sanitizada (indexada)                       |
-| original_name | string   | Nome original do upload                           |
-| mime          | string   | MIME detectado via `finfo`                        |
-| size          | bigint   | Tamanho em bytes                                  |
-| checksum      | string   | SHA-256 do arquivo (opcional)                     |
-| uploaded_by   | integer  | Referência opcional ao usuário autenticado        |
-| timestamps    | datetime | Datas de criação/atualização                      |
+## Próximos passos
 
-Pronto! Configure o `.env`, rode as migrações e comece a gerenciar seus assets com segurança.
+✅ **Ambiente local configurado?** Você está pronto para desenvolver!
+
+🚀 **Pronto para deploy?** Consulte o [README_PRODUCTION.md](README_PRODUCTION.md) para:
+- Build de produção
+- Deploy manual
+- Deploy automatizado via GitHub Actions (FTPS)
+- Configuração de servidor web (Apache/Nginx)
+- Troubleshooting
+
+📚 **Documentação adicional:**
+- [Roadmap do projeto](https://assetsme.featurebase.app/en/roadmap)
+
+---
+
+**Última atualização:** Outubro 2025
