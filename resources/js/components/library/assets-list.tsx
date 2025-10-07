@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Image, Paperclip } from 'lucide-react';
 import { useState } from 'react';
 
-const assetsBase = (import.meta.env.VITE_API_URL as string | undefined) ?? '/assets/';
+const root = (import.meta.env.VITE_API_URL as string | undefined) ?? window.location.origin;
+const assetsBase = `${root}/assets`;
 
 interface AssetsListProps {
     assets: LibraryAsset[];
