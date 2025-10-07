@@ -57,4 +57,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(AccessToken::class);
     }
+
+    public function folders()
+    {
+        return $this->hasMany(Folder::class, 'owner_id');
+    }
 }

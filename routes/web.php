@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UsersPageController;
 use App\Http\Controllers\TokenController;
+use App\Http\Controllers\Library\LibraryPageController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -23,6 +24,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('assets/list', function () {
         return Inertia::render('assets/list');
     })->name('assets.list');
+
+    Route::get('library', LibraryPageController::class)->name('library.index');
+    Route::get('library/{folder}', LibraryPageController::class)
+        ->whereNumber('folder')
+        ->name('library.show');
 
     Route::resource('tokens', TokenController::class)->only(['index', 'store', 'destroy']);
 
