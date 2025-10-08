@@ -121,3 +121,9 @@ export async function createFolderToken(folderId: number): Promise<FolderTokenRe
         method: 'POST',
     });
 }
+
+export async function toggleAssetPreview(folderId: number, assetId: number): Promise<{ data: { preview_asset_ids: number[] } }> {
+    return request<{ data: { preview_asset_ids: number[] } }>(`/api/v1/folders/${folderId}/assets/${assetId}/toggle-preview`, {
+        method: 'POST',
+    });
+}

@@ -22,7 +22,7 @@ class TokenController extends Controller
             ->map(fn (AccessToken $token) => [
                 'id' => $token->id,
                 'name' => $token->name,
-                'preview' => $token->token_hash ? substr($token->token_hash, -4) : null,
+                'preview' => substr($token->token_hash, -8),
                 'created_at' => $token->created_at,
                 'last_used_at' => $token->last_used_at,
             ])

@@ -23,6 +23,7 @@ class FolderResource extends JsonResource
             'folders_count' => $this->folders_count,
             'preview_asset_ids' => $this->preview_asset_ids ?? [],
             'breadcrumbs' => $this->breadcrumbs ?? [],
+            'full_path' => $this->full_path ?? '',
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'deleted_at' => $this->deleted_at?->toIso8601String(),

@@ -76,13 +76,6 @@ export function FolderCard({ folder, onClick }: FolderCardProps) {
             <Card
                 ref={ref}
                 className="group cursor-pointer transition hover:border-primary"
-                onClick={onClick}
-                onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        onClick();
-                    }
-                }}
                 role="button"
                 tabIndex={0}
             >
@@ -125,8 +118,18 @@ export function FolderCard({ folder, onClick }: FolderCardProps) {
                         previewContent
                     )}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="secondary">{folder.folders_count} pastas</Badge>
-                        <Badge variant="secondary">{folder.files_count} arquivos</Badge>
+                        <Button 
+                            variant="default"
+                            className="w-full bg-primary text-primary-foreground cursor-pointer"
+                            size="sm"
+                            onClick={onClick}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        onClick();
+                                }
+                            }} 
+                        >Acessar pasta</Button>
                     </div>
                 </CardContent>
             </Card>

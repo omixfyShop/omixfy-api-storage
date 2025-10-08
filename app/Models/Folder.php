@@ -166,6 +166,22 @@ class Folder extends Model
         return $breadcrumbs->values();
     }
 
+    /**
+     * Full path accessor returning the full path of the folder.
+     */
+    public function getFullPathAttribute(): string
+    {
+        $path = collect();
+        $current = $this;
+
+        while ($current) {
+            $path->prepend($current->slug);
+            $current = $current->parent;
+        }
+
+        return $path->implode('/');
+    }
+
     public function refreshPreview(): void
     {
         GenerateFolderPreview::dispatchSync($this->id);

@@ -266,4 +266,45 @@ class FolderController extends Controller
             ],
         ], 201);
     }
+
+    public function togglePreview(Request $request, Folder $folder, Asset $asset): JsonResponse
+    {
+        $this->authorize('update', $folder);
+
+        // Verify that the asset belongs to this folder
+        if ($asset->folder_id !== $folder->id) {
+            return response()->json([
+                'message' => 'Asset does not belong to this folder.',
+            ], 404);
+        }
+
+        $previewIds = $folder->preview_asset_ids ?? [];
+
+        if (in_array($asset->id, $previewIds, true)) {
+            // Remove from preview (unset)
+            $previewIds = [];
+        } else {
+            // Set as the only preview (replace any existing)
+            $previewIds = [$asset->id];
+        }
+
+        $folder->preview_asset_ids = $previewIds;
+        $folder->save();
+
+        GenerateFolderPreview::dispatch($folder->id);
+
+        Log::info('library:preview-toggle', [
+            'user_id' => $this->getUserId($request),
+            'folder_id' => $folder->id,
+            'asset_id' => $asset->id,
+            'preview_ids' => $previewIds,
+            'action' => empty($previewIds) ? 'removed' : 'set',
+        ]);
+
+        return response()->json([
+            'data' => [
+                'preview_asset_ids' => $previewIds,
+            ],
+        ]);
+    }
 }

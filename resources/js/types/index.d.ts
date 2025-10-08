@@ -106,6 +106,7 @@ export interface LibraryFolder {
     folders_count: number;
     preview_asset_ids: number[];
     breadcrumbs: LibraryFolderBreadcrumb[];
+    full_path?: string;
     created_at: string;
     updated_at: string;
     deleted_at?: string | null;

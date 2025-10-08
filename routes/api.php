@@ -23,6 +23,7 @@ Route::middleware('token')->group(function () {
       Route::get('/folders/{folder}/children', [FolderController::class, 'children']);
       Route::get('/folders/{folder}/preview', [FolderController::class, 'preview']);
       Route::post('/folders/{folder}/tokens', [FolderController::class, 'createToken']);
+      Route::post('/folders/{folder}/assets/{asset}/toggle-preview', [FolderController::class, 'togglePreview']);
   });
 });
 

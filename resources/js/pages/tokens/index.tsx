@@ -41,7 +41,7 @@ function tokenPreview(preview?: string | null): string {
         return '••••';
     }
 
-    return `•••• ${preview}`;
+    return `••••${preview}`;
 }
 
 export default function TokensIndex() {

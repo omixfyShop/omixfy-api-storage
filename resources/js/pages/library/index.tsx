@@ -1,18 +1,21 @@
-import { fetchFolder, fetchFolderChildren, listFolders, type FolderChildrenResponse } from '@/api/library';
+import { fetchFolder, fetchFolderChildren, listFolders } from '@/api/library';
 import { LibraryLayout } from '@/components/library/library-layout';
 import { FolderGrid } from '@/components/library/folder-grid';
 import { AssetsList } from '@/components/library/assets-list';
 import { CreateFolderDialog } from '@/components/library/create-folder-dialog';
+import { UploadDialog } from '@/components/library/upload-dialog';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import type { BreadcrumbItem, LibraryFolder, LibraryFolderBreadcrumb } from '@/types';
+import type { BreadcrumbItem, FolderChildrenResponse, LibraryFolder, LibraryFolderBreadcrumb } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Upload } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-interface LibraryPageProps {
+type LibraryPageProps = {
     initialFolderId: number | null;
     initialBreadcrumbs: LibraryFolderBreadcrumb[];
-}
+};
 
 const baseBreadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -34,6 +37,8 @@ export default function LibraryIndex() {
     const [order, setOrder] = useState<OrderDirection>('asc');
     const [page, setPage] = useState(1);
     const [createOpen, setCreateOpen] = useState(false);
+    const [uploadOpen, setUploadOpen] = useState(false);
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         setCurrentFolderId(initialFolderId);
@@ -59,7 +64,6 @@ export default function LibraryIndex() {
                 per_page: PER_PAGE,
             }),
         enabled: isRoot,
-        keepPreviousData: true,
     });
 
     const folderChildrenQuery = useQuery({
@@ -73,7 +77,6 @@ export default function LibraryIndex() {
                 per_page: PER_PAGE,
             }),
         enabled: !isRoot && currentFolderId !== null,
-        keepPreviousData: true,
     });
 
     const folderDetailQuery = useQuery({
@@ -133,6 +136,8 @@ export default function LibraryIndex() {
     const hasPrev = (foldersMeta?.current_page ?? 1) > 1;
     const hasNext = (foldersMeta?.last_page ?? 1) > (foldersMeta?.current_page ?? 1);
 
+    const currentFolder = folderDetailQuery.data?.data;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={pageTitle} />
@@ -156,6 +161,13 @@ export default function LibraryIndex() {
                     setOrder(value);
                     setPage(1);
                 }}
+                actionSlot={
+                    !isRoot && currentFolderId ? (
+                        <Button onClick={() => setUploadOpen(true)} variant="outline" className="gap-2">
+                            <Upload className="h-4 w-4" /> Enviar arquivo
+                        </Button>
+                    ) : null
+                }
             >
                 <FolderGrid
                     folders={folders}
@@ -169,7 +181,11 @@ export default function LibraryIndex() {
                     }
                 />
 
-                <AssetsList assets={assets} />
+                <AssetsList 
+                    assets={assets} 
+                    folderId={currentFolderId}
+                    previewAssetIds={currentFolder?.preview_asset_ids ?? []}
+                />
 
                 {foldersMeta ? (
                     <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
@@ -200,6 +216,15 @@ export default function LibraryIndex() {
             </div>
 
             <CreateFolderDialog open={createOpen} onOpenChange={setCreateOpen} parentId={currentFolderId} />
+            
+            {!isRoot && currentFolderId && currentFolder && (
+                <UploadDialog 
+                    open={uploadOpen} 
+                    onOpenChange={setUploadOpen} 
+                    folderId={currentFolderId}
+                    folderName={currentFolder.name}
+                />
+            )}
         </AppLayout>
     );
 }
