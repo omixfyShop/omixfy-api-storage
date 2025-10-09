@@ -1,8 +1,7 @@
 import type { LibraryAsset } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Image, Paperclip, Star } from 'lucide-react';
+import { Image, Star, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { toggleAssetPreview } from '@/api/library';
 import { useToast } from '@/hooks/use-toast';
@@ -123,11 +122,7 @@ export function AssetsList({ assets, folderId, previewAssetIds = [] }: AssetsLis
                             <CardContent>
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                     <div className="flex items-center gap-2">
-                                        {isImage ? (
-                                            <Image className="h-4 w-4" />
-                                        ) : (
-                                            <Paperclip className="h-4 w-4" />
-                                        )}
+                                        <ExternalLink className="h-4 w-4" />
                                         <a href={`${assetsBase}${asset.path}`} target="_blank" rel="noreferrer">
                                             <span>{asset.path}</span>
                                         </a>
