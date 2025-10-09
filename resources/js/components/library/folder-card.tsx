@@ -27,7 +27,7 @@ interface FolderCardProps {
     onClick: () => void;
 }
 
-const assetsBase = (import.meta.env.VITE_ASSETSME_TOKEN as string | undefined) ?? window.location.origin + '/assets/';;
+const assetsBase = window.location.origin + '/assets/';;
 const normalizedBase = assetsBase.endsWith('/') ? assetsBase : `${assetsBase}/`;
 
 export function FolderCard({ folder, onClick }: FolderCardProps) {
