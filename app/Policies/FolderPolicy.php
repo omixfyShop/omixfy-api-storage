@@ -9,7 +9,7 @@ class FolderPolicy
 {
     public function view(User $user, Folder $folder): bool
     {
-        return $folder->owner_id === $user->id;
+        return true;
     }
 
     public function create(User $user): bool
@@ -19,16 +19,16 @@ class FolderPolicy
 
     public function update(User $user, Folder $folder): bool
     {
-        return $folder->owner_id === $user->id;
+        return true;
     }
 
     public function delete(User $user, Folder $folder): bool
     {
-        return $folder->owner_id === $user->id;
+        return true;
     }
 
     public function restore(User $user, Folder $folder): bool
     {
-        return $folder->owner_id === $user->id;
+        return true;
     }
 }

@@ -374,7 +374,6 @@ class AssetController extends Controller
             // Look for existing folder
             $existingFolder = Folder::where('name', $folderName)
                 ->where('parent_id', $currentParentId)
-                ->where('owner_id', $userId)
                 ->first();
 
             if ($existingFolder) {
