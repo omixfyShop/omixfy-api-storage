@@ -48,7 +48,6 @@ class FolderController extends Controller
         $hasSearch = $request->filled('q');
 
         $query = Folder::query()
-            ->ownedBy($userId)
             ->when($hasParent, fn (Builder $builder) => $builder->where('parent_id', $request->integer('parent_id')))
             ->when(!$hasParent && !$hasSearch, fn (Builder $builder) => $builder->whereNull('parent_id'))
             ->when($hasSearch, fn (Builder $builder) => $builder->where('name', 'like', '%'.$request->get('q').'%'))
@@ -73,7 +72,7 @@ class FolderController extends Controller
         $parent = null;
 
         if ($parentId) {
-            $parent = Folder::ownedBy($userId)->findOrFail($parentId);
+            $parent = Folder::findOrFail($parentId);
         }
 
         $name = trim($request->input('name'));
@@ -204,14 +203,12 @@ class FolderController extends Controller
         }
 
         $folders = Folder::query()
-            ->ownedBy($userId)
             ->where('parent_id', $folder->id)
             ->orderBy($orderBy, $order)
             ->paginate($perPage, ['*'], 'folders_page');
 
         $assets = Asset::query()
             ->where('folder_id', $folder->id)
-            ->where('owner_id', $userId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage, ['*'], 'assets_page');
 
