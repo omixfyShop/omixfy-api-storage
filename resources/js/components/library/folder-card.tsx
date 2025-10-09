@@ -61,10 +61,10 @@ export function FolderCard({ folder, onClick }: FolderCardProps) {
     
     const previewContent = previewAssets.length ? (
         <div className="flex h-32 overflow-hidden rounded-md" style={{ backgroundColor: folderColor }} onClick={onClick}>
-            {previewAssets.slice(0, 4).map((asset) => {
+            {previewAssets.map((asset) => {
                 const thumb = (asset.preview_thumb as { path?: string } | undefined)?.path ?? asset.path;
                 const url = `${normalizedBase}${thumb}`;
-                return <img key={asset.id} src={url} alt="Prévia da pasta" className="h-full w-full object-contain object-center" loading="lazy" />;
+                return <img key={asset.id} src={url} alt="Prévia da pasta" className="h-full w-full object-contain object-center" loading="lazy" style={{ backgroundColor: 'rgb(255 255 255 / 70%)' }} />;
             })}
         </div>
     ) : (
