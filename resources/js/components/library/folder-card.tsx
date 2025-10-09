@@ -27,7 +27,7 @@ interface FolderCardProps {
     onClick: () => void;
 }
 
-const assetsBase = window.location.origin + '/assets/';;
+const assetsBase = window.location.origin + '/assets/';
 const normalizedBase = assetsBase.endsWith('/') ? assetsBase : `${assetsBase}/`;
 
 export function FolderCard({ folder, onClick }: FolderCardProps) {
@@ -60,11 +60,11 @@ export function FolderCard({ folder, onClick }: FolderCardProps) {
     };
     
     const previewContent = previewAssets.length ? (
-        <div className="grid h-32 overflow-hidden rounded-md bg-muted">
+        <div className="flex h-32 overflow-hidden rounded-md" style={{ backgroundColor: folderColor }} onClick={onClick}>
             {previewAssets.slice(0, 4).map((asset) => {
                 const thumb = (asset.preview_thumb as { path?: string } | undefined)?.path ?? asset.path;
                 const url = `${normalizedBase}${thumb}`;
-                return <img key={asset.id} src={url} alt="Prévia da pasta" className="h-full w-full object-cover" loading="lazy" />;
+                return <img key={asset.id} src={url} alt="Prévia da pasta" className="h-full w-full object-contain object-center" loading="lazy" />;
             })}
         </div>
     ) : (
