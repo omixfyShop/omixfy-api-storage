@@ -64,7 +64,7 @@ export function FolderCard({ folder, onClick }: FolderCardProps) {
             {previewAssets.map((asset) => {
                 const thumb = (asset.preview_thumb as { path?: string } | undefined)?.path ?? asset.path;
                 const url = `${normalizedBase}${thumb}`;
-                return <img key={asset.id} src={url} alt="Prévia da pasta" className="h-full w-full object-contain object-center" loading="lazy" style={{ backgroundColor: 'rgb(255 255 255 / 59%)' }} />;
+                return <img key={asset.id} src={url} alt="Prévia da pasta" className="h-full w-full object-contain object-center" loading="lazy" style={{ backgroundColor: 'rgb(255 255 255 / 70%)' }} />;
             })}
         </div>
     ) : (
