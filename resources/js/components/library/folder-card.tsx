@@ -1,5 +1,4 @@
 import { fetchFolderPreview } from '@/api/library';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -13,9 +12,10 @@ import {
 import { useInView } from '@/hooks/use-in-view';
 import { useToast } from '@/hooks/use-toast';
 import { useClipboard } from '@/hooks/use-clipboard';
+import { getTextColor } from '@/lib/text-color-get';
 import type { LibraryFolder } from '@/types';
 import { useQuery } from '@tanstack/react-query';
-import { Folder, ImageDown, MoreHorizontal } from 'lucide-react';
+import { Folder, MoreHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CreateFolderDialog } from './create-folder-dialog';
 import { DeleteRestoreDialog } from './delete-restore-dialog';
@@ -27,7 +27,7 @@ interface FolderCardProps {
     onClick: () => void;
 }
 
-const assetsBase = (import.meta.env.VITE_ASSETS_BASE_URL as string | undefined) ?? '/storage/';
+const assetsBase = (import.meta.env.VITE_ASSETSME_TOKEN as string | undefined) ?? window.location.origin + '/assets/';;
 const normalizedBase = assetsBase.endsWith('/') ? assetsBase : `${assetsBase}/`;
 
 export function FolderCard({ folder, onClick }: FolderCardProps) {
@@ -48,6 +48,8 @@ export function FolderCard({ folder, onClick }: FolderCardProps) {
     });
 
     const previewAssets = useMemo(() => previewQuery.data?.data ?? [], [previewQuery.data?.data]);
+    const folderColor = useMemo(() => getTextColor(folder.name), [folder.name]);
+    const firstLetter = useMemo(() => folder.name.split(' ').map((word) => word[0].toUpperCase()).join(''), [folder.name]);
 
     const handleCopy = (value: string, label: string) => {
         copy(value).then((copied) => {
@@ -56,9 +58,9 @@ export function FolderCard({ folder, onClick }: FolderCardProps) {
             }
         });
     };
-
+    
     const previewContent = previewAssets.length ? (
-        <div className="grid h-32 grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-md bg-muted">
+        <div className="grid h-32 overflow-hidden rounded-md bg-muted">
             {previewAssets.slice(0, 4).map((asset) => {
                 const thumb = (asset.preview_thumb as { path?: string } | undefined)?.path ?? asset.path;
                 const url = `${normalizedBase}${thumb}`;
@@ -66,8 +68,13 @@ export function FolderCard({ folder, onClick }: FolderCardProps) {
             })}
         </div>
     ) : (
-        <div className="flex h-32 items-center justify-center rounded-md bg-muted">
-            <ImageDown className="h-8 w-8 text-muted-foreground" />
+        <div 
+            className="flex h-32 items-center justify-center rounded-md"
+            style={{ backgroundColor: folderColor }}
+        >
+            <span className="text-5xl font-bold text-white drop-shadow-lg drop-shadow-black/50">
+                {firstLetter}
+            </span>
         </div>
     );
 
