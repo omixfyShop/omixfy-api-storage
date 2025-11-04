@@ -159,13 +159,21 @@ class AssetController extends Controller
             ]);
 
             $sizes = [];
+            $variantMetadata = [];
 
             try {
-                $sizes = $imageResize->generateVariantUrls($relativePath, $folder, $fileName, $variantDefinitions);
+                $variantResult = $imageResize->generateVariantData($relativePath, $folder, $fileName, $variantDefinitions);
+                $sizes = $variantResult['urls'];
+                $variantMetadata = $variantResult['metadata'];
             } catch (\Throwable $exception) {
                 return new JsonResponse([
                     'message' => 'Failed to generate one or more image variants.',
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            if ($variantMetadata !== []) {
+                $asset->generated_thumbs = $variantMetadata;
+                $asset->save();
             }
 
             $result = [
@@ -183,6 +191,10 @@ class AssetController extends Controller
 
             if ($sizes !== []) {
                 $result['sizes'] = $sizes;
+            }
+
+            if ($variantMetadata !== []) {
+                $result['generated_thumbs'] = $variantMetadata;
             }
 
             $results[] = $result;
