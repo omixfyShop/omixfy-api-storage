@@ -94,8 +94,10 @@ class ImageResize
 
     /**
      * Generate and persist a resized variant of the original image.
+     *
+     * @return array{width:int,height:int,bytes:int}
      */
-    public function makeVariant(string $sourcePath, string $destinationPath, int $width, int $height): void
+    public function makeVariant(string $sourcePath, string $destinationPath, int $width, int $height): array
     {
         $contents = $this->disk->get($sourcePath);
         $image = Image::make($contents)->resize($width, $height, function ($constraint) {
@@ -105,15 +107,37 @@ class ImageResize
 
         $format = strtolower(pathinfo($destinationPath, PATHINFO_EXTENSION));
 
-        $this->disk->put($destinationPath, (string) $image->encode($format ?: null));
+        $encoded = (string) $image->encode($format ?: null);
+
+        $this->disk->put($destinationPath, $encoded);
+
+        return [
+            'width' => $image->width(),
+            'height' => $image->height(),
+            'bytes' => strlen($encoded),
+        ];
     }
 
     /**
-     * Generate each requested variant for the given asset and return their URLs.
+     * Generate each requested variant for the given asset and return their URLs and metadata.
+     *
+     * @return array{
+     *     urls: array<string, string>,
+     *     metadata: array<string, array{
+     *         url: string,
+     *         path: string,
+     *         width: int,
+     *         height: int,
+     *         bytes: int,
+     *         requested_width: int,
+     *         requested_height: int,
+     *     }>
+     * }
      */
-    public function generateVariantUrls(string $relativePath, ?string $folder, string $fileName, array $variantDefinitions): array
+    public function generateVariantData(string $relativePath, ?string $folder, string $fileName, array $variantDefinitions): array
     {
-        $sizes = [];
+        $urls = [];
+        $metadata = [];
 
         foreach ($variantDefinitions as $variantKey => $dimensions) {
             if ($dimensions === null) {
@@ -123,11 +147,25 @@ class ImageResize
             $variantFileName = $this->buildVariantFilename($fileName, $variantKey);
             $variantRelativePath = ltrim(($folder ? $folder.'/' : '').$variantFileName, '/');
 
-            $this->makeVariant($relativePath, $variantRelativePath, $dimensions['width'], $dimensions['height']);
+            $variantProperties = $this->makeVariant($relativePath, $variantRelativePath, $dimensions['width'], $dimensions['height']);
 
-            $sizes[$variantKey] = $this->disk->url($variantRelativePath);
+            $variantUrl = $this->disk->url($variantRelativePath);
+
+            $urls[$variantKey] = $variantUrl;
+            $metadata[$variantKey] = [
+                'url' => $variantUrl,
+                'path' => $variantRelativePath,
+                'width' => $variantProperties['width'],
+                'height' => $variantProperties['height'],
+                'bytes' => $variantProperties['bytes'],
+                'requested_width' => $dimensions['width'],
+                'requested_height' => $dimensions['height'],
+            ];
         }
 
-        return $sizes;
+        return [
+            'urls' => $urls,
+            'metadata' => $metadata,
+        ];
     }
 }
