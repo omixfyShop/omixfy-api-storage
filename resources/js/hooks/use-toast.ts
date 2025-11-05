@@ -1,3 +1,5 @@
+import { useToastContext } from '@/contexts/toast-context';
+
 interface ToastOptions {
     title: string;
     description?: string;
@@ -5,11 +7,6 @@ interface ToastOptions {
 }
 
 export function useToast() {
-    function toast({ title, description, variant = 'default' }: ToastOptions) {
-        const prefix = variant === 'destructive' ? 'Erro' : variant === 'success' ? 'Sucesso' : 'Info';
-         
-        window.setTimeout(() => window.alert(`${prefix}: ${title}${description ? `\n${description}` : ''}`), 0);
-    }
-
+    const { toast } = useToastContext();
     return { toast } as const;
 }

@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { initializeTheme } from './hooks/use-appearance';
+import { ToastProvider } from './contexts/toast-context';
+import { ToastDialog } from './components/toast-dialog';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 const pages = import.meta.glob('./pages/**/*.tsx');
@@ -30,7 +32,10 @@ createInertiaApp({
 
         root.render(
             <QueryClientProvider client={queryClient}>
-                <App {...props} />
+                <ToastProvider>
+                    <App {...props} />
+                    <ToastDialog />
+                </ToastProvider>
             </QueryClientProvider>,
         );
     },

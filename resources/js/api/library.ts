@@ -122,8 +122,27 @@ export async function createFolderToken(folderId: number): Promise<FolderTokenRe
     });
 }
 
-export async function toggleAssetPreview(folderId: number, assetId: number): Promise<{ data: { preview_asset_ids: number[] } }> {
-    return request<{ data: { preview_asset_ids: number[] } }>(`/api/v1/folders/${folderId}/assets/${assetId}/toggle-preview`, {
+export async function toggleAssetPreview(folderId: number, assetId: number | string): Promise<{ data: { preview_asset_ids: (number | string)[] } }> {
+    return request<{ data: { preview_asset_ids: (number | string)[] } }>(`/api/v1/folders/${folderId}/assets/${assetId}/toggle-preview`, {
         method: 'POST',
+    });
+}
+
+export interface RenameAssetPayload {
+    path: string;
+    name: string;
+}
+
+export interface RenameAssetResponse {
+    id: string;
+    path: string;
+    url: string;
+    generated_thumbs: Record<string, { url: string; path: string }>;
+}
+
+export async function renameAsset(payload: RenameAssetPayload): Promise<RenameAssetResponse> {
+    return request<RenameAssetResponse>(`/api/assets/rename`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
     });
 }

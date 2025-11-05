@@ -1,11 +1,14 @@
 import type { LibraryAsset } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Image, Star, ExternalLink } from 'lucide-react';
+import { Image, Star, ExternalLink, Pencil, MoreVertical, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toggleAssetPreview } from '@/api/library';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { RenameAssetDialog } from './rename-asset-dialog';
 
 const root = (import.meta.env.VITE_API_URL as string | undefined) ?? window.location.origin;
 const assetsBase = `${root}/assets/`;
@@ -13,7 +16,27 @@ const assetsBase = `${root}/assets/`;
 interface AssetsListProps {
     assets: LibraryAsset[];
     folderId?: number | null;
-    previewAssetIds?: number[];
+    previewAssetIds?: (number | string)[];
+}
+
+function hasThumbnails(asset: LibraryAsset): boolean {
+    if (!asset.generated_thumbs || Array.isArray(asset.generated_thumbs)) {
+        return false;
+    }
+    return Object.keys(asset.generated_thumbs).length > 0;
+}
+
+function getThumbnailSizes(asset: LibraryAsset): Array<'small' | 'medium' | 'large'> {
+    if (!hasThumbnails(asset)) {
+        return [];
+    }
+    const thumbs = asset.generated_thumbs;
+    if (!thumbs || Array.isArray(thumbs)) {
+        return [];
+    }
+    return Object.keys(thumbs).filter(
+        (key): key is 'small' | 'medium' | 'large' => ['small', 'medium', 'large'].includes(key)
+    );
 }
 
 function formatBytes(bytes: number | null): string {
@@ -52,9 +75,10 @@ function ImagePreview({ asset }: { asset: LibraryAsset }) {
 export function AssetsList({ assets, folderId, previewAssetIds = [] }: AssetsListProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const [renameAsset, setRenameAsset] = useState<LibraryAsset | null>(null);
 
     const togglePreviewMutation = useMutation({
-        mutationFn: async ({ assetId }: { assetId: number }) => {
+        mutationFn: async ({ assetId }: { assetId: number | string }) => {
             if (!folderId) {
                 throw new Error('Folder ID is required');
             }
@@ -81,7 +105,7 @@ export function AssetsList({ assets, folderId, previewAssetIds = [] }: AssetsLis
         return null;
     }
 
-    const handleTogglePreview = (assetId: number) => {
+    const handleTogglePreview = (assetId: number | string) => {
         togglePreviewMutation.mutate({ assetId });
     };
 
@@ -92,25 +116,79 @@ export function AssetsList({ assets, folderId, previewAssetIds = [] }: AssetsLis
                 {assets.map((asset) => {
                     const isPreview = previewAssetIds.includes(asset.id);
                     const isImage = asset.mime.startsWith('image');
+                    const thumbnailSizes = getThumbnailSizes(asset);
+                    const hasThumbs = hasThumbnails(asset);
                     
                     return (
                         <Card key={asset.id} className={`border border-dashed border-border/70 bg-background/50 ${isPreview ? 'ring-2 ring-primary/50' : ''}`}>
                             <div className="p-4 relative">
                                 <ImagePreview asset={asset} />
-                                {folderId && isImage && (
-                                    <button
-                                        onClick={() => handleTogglePreview(asset.id)}
-                                        disabled={togglePreviewMutation.isPending}
-                                        className={`absolute top-6 right-6 flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                            isPreview 
-                                                ? 'bg-primary text-primary-foreground shadow-md' 
-                                                : 'bg-muted/80 text-muted-foreground hover:bg-muted'
-                                        }`}
-                                        title={isPreview ? 'Remover do preview' : 'Usar como preview'}
-                                    >
-                                        <Star className={`h-3 w-3 ${isPreview ? 'fill-current' : ''}`} />
-                                        {isPreview && 'Preview'}
-                                    </button>
+                                <div className="absolute top-6 right-6 flex items-center gap-2">
+                                    {folderId && isImage && (
+                                        <button
+                                            onClick={() => handleTogglePreview(asset.id)}
+                                            disabled={togglePreviewMutation.isPending}
+                                            className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                                isPreview 
+                                                    ? 'bg-primary text-primary-foreground shadow-md' 
+                                                    : 'bg-muted/80 text-muted-foreground hover:bg-muted'
+                                            }`}
+                                            title={isPreview ? 'Remover do preview' : 'Usar como preview'}
+                                        >
+                                            <Star className={`h-3 w-3 ${isPreview ? 'fill-current' : ''}`} />
+                                            {isPreview && 'Preview'}
+                                        </button>
+                                    )}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 rounded-full bg-muted/80 text-muted-foreground hover:bg-muted"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => setRenameAsset(asset)}>
+                                                <Pencil className="h-4 w-4 mr-2" />
+                                                Renomear
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem disabled className="text-muted-foreground">
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Deletar
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                                {hasThumbs && isImage && (
+                                    <div className="mt-2 flex justify-center gap-1">
+                                        {thumbnailSizes.map((size) => {
+                                            const thumbs = asset.generated_thumbs;
+                                            if (!thumbs || Array.isArray(thumbs)) return null;
+                                            const thumb = thumbs[size];
+                                            if (!thumb) return null;
+                                            
+                                            return (
+                                                <a
+                                                    key={size}
+                                                    href={thumb.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="cursor-pointer"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Badge 
+                                                        variant="secondary" 
+                                                        className="text-xs capitalize hover:bg-secondary/80 transition-colors"
+                                                    >
+                                                        {size}
+                                                    </Badge>
+                                                </a>
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </div>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -134,6 +212,13 @@ export function AssetsList({ assets, folderId, previewAssetIds = [] }: AssetsLis
                     );
                 })}
             </div>
+            {renameAsset && (
+                <RenameAssetDialog
+                    asset={renameAsset}
+                    open={!!renameAsset}
+                    onOpenChange={(open) => !open && setRenameAsset(null)}
+                />
+            )}
         </div>
     );
 }

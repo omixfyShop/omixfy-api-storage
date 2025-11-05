@@ -104,7 +104,7 @@ export interface LibraryFolder {
     depth: number;
     files_count: number;
     folders_count: number;
-    preview_asset_ids: number[];
+    preview_asset_ids: (number | string)[];
     breadcrumbs: LibraryFolderBreadcrumb[];
     full_path?: string;
     created_at: string;
@@ -120,8 +120,18 @@ export interface LibraryAssetPreviewMeta {
     format: string;
 }
 
+export interface LibraryAssetThumbnail {
+    url: string;
+    path: string;
+    width: number;
+    height: number;
+    bytes: number;
+    requested_width: number;
+    requested_height: number;
+}
+
 export interface LibraryAsset {
-    id: number;
+    id: string;
     path: string;
     folder_id: number | null;
     owner_id: number;
@@ -129,7 +139,7 @@ export interface LibraryAsset {
     width: number | null;
     height: number | null;
     size_bytes: number | null;
-    generated_thumbs: Record<string, unknown> | null;
+    generated_thumbs: Record<'small' | 'medium' | 'large', LibraryAssetThumbnail> | [] | null;
     preview_thumb?: LibraryAssetPreviewMeta | null;
     created_at: string;
     updated_at: string;

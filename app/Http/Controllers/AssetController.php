@@ -159,13 +159,21 @@ class AssetController extends Controller
             ]);
 
             $sizes = [];
+            $variantMetadata = [];
 
             try {
-                $sizes = $imageResize->generateVariantUrls($relativePath, $folder, $fileName, $variantDefinitions);
+                $variantResult = $imageResize->generateVariantData($relativePath, $folder, $fileName, $variantDefinitions);
+                $sizes = $variantResult['urls'];
+                $variantMetadata = $variantResult['metadata'];
             } catch (\Throwable $exception) {
                 return new JsonResponse([
                     'message' => 'Failed to generate one or more image variants.',
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            if ($variantMetadata !== []) {
+                $asset->generated_thumbs = $variantMetadata;
+                $asset->save();
             }
 
             $result = [
@@ -183,6 +191,10 @@ class AssetController extends Controller
 
             if ($sizes !== []) {
                 $result['sizes'] = $sizes;
+            }
+
+            if ($variantMetadata !== []) {
+                $result['generated_thumbs'] = $variantMetadata;
             }
 
             $results[] = $result;
@@ -296,6 +308,123 @@ class AssetController extends Controller
         $asset->delete();
 
         return new JsonResponse(['deleted' => true]);
+    }
+
+    /**
+     * Rename an asset by path.
+     */
+    public function rename(Request $request): JsonResponse
+    {
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'path' => ['required', 'string', 'regex:/^[a-zA-Z0-9_\.\-\/]+$/'],
+                'name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9_\.\-]+$/'],
+            ],
+            [
+                'path.regex' => 'Path may only contain letters, numbers, dots, slashes, dashes, and underscores.',
+                'name.regex' => 'Name may only contain letters, numbers, dots, dashes, and underscores.',
+            ],
+        );
+
+        if ($validator->fails()) {
+            return $this->validationErrorResponse($validator->errors()->toArray());
+        }
+
+        $validated = $validator->validated();
+        $path = $this->normalizePath($validated['path']);
+
+        if ($path === null) {
+            return $this->validationErrorResponse(['path' => ['The path provided is invalid.']]);
+        }
+
+        $asset = Asset::query()->where('path', $path)->first();
+
+        if (! $asset) {
+            return new JsonResponse(['message' => 'Asset not found.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $disk = $this->disk();
+        $oldPath = $asset->path;
+        $oldDir = dirname($oldPath);
+        $oldFileName = basename($oldPath);
+        $oldBaseName = pathinfo($oldFileName, PATHINFO_FILENAME);
+        $extension = pathinfo($oldFileName, PATHINFO_EXTENSION);
+
+        $newName = trim($validated['name']);
+        $newFileName = $extension ? "{$newName}.{$extension}" : $newName;
+        $newPath = $oldDir !== '.' ? "{$oldDir}/{$newFileName}" : $newFileName;
+
+        if ($disk->exists($newPath) && $newPath !== $oldPath) {
+            $datetime = now()->format('YmdHis');
+            $newFileName = $extension ? "{$newName}-{$datetime}.{$extension}" : "{$newName}-{$datetime}";
+            $newPath = $oldDir !== '.' ? "{$oldDir}/{$newFileName}" : $newFileName;
+        }
+
+        try {
+            $disk->move($oldPath, $newPath);
+
+            $updatedThumbs = [];
+            if ($asset->generated_thumbs && is_array($asset->generated_thumbs)) {
+                foreach ($asset->generated_thumbs as $thumbKey => $thumbData) {
+                    if (!isset($thumbData['path'])) {
+                        $updatedThumbs[$thumbKey] = $thumbData;
+                        continue;
+                    }
+
+                    $oldThumbPath = $thumbData['path'];
+                    $thumbDir = dirname($oldThumbPath);
+
+                    $oldThumbFileName = basename($oldThumbPath);
+                    $oldThumbBaseName = pathinfo($oldThumbFileName, PATHINFO_FILENAME);
+                    $thumbExtension = pathinfo($oldThumbFileName, PATHINFO_EXTENSION);
+
+                    if (str_contains($oldThumbBaseName, '--')) {
+                        $parts = explode('--', $oldThumbBaseName, 2);
+                        $variantSuffix = $parts[1] ?? '';
+                        $newThumbBaseName = "{$newName}--{$variantSuffix}";
+                    } elseif (preg_match('/^' . preg_quote($oldBaseName, '/') . '_(\d+)$/', $oldThumbBaseName, $matches)) {
+                        $variantSuffix = $matches[1];
+                        $newThumbBaseName = "{$newName}_{$variantSuffix}";
+                    } elseif (str_starts_with($oldThumbBaseName, $oldBaseName)) {
+                        $suffix = substr($oldThumbBaseName, strlen($oldBaseName));
+                        $newThumbBaseName = "{$newName}{$suffix}";
+                    } else {
+                        $newThumbBaseName = $newName;
+                    }
+
+                    $newThumbFileName = $thumbExtension ? "{$newThumbBaseName}.{$thumbExtension}" : $newThumbBaseName;
+                    $newThumbPath = $thumbDir !== '.' ? "{$thumbDir}/{$newThumbFileName}" : $newThumbFileName;
+
+                    if ($disk->exists($oldThumbPath)) {
+                        $disk->move($oldThumbPath, $newThumbPath);
+                    }
+
+                    $updatedThumbs[$thumbKey] = array_merge($thumbData, [
+                        'path' => $newThumbPath,
+                        'url' => $disk->url($newThumbPath),
+                    ]);
+                }
+            }
+
+            $asset->path = $newPath;
+            if (!empty($updatedThumbs)) {
+                $asset->generated_thumbs = $updatedThumbs;
+            }
+            $asset->save();
+
+            return new JsonResponse([
+                'id' => $asset->id,
+                'path' => $asset->path,
+                'url' => $disk->url($asset->path),
+                'generated_thumbs' => $asset->generated_thumbs ?? [],
+            ], Response::HTTP_OK);
+        } catch (\Throwable $exception) {
+            return new JsonResponse([
+                'message' => 'Failed to rename asset.',
+                'error' => $exception->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**

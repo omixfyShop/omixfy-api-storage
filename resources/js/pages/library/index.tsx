@@ -11,6 +11,8 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { HttpError } from '@/api/http';
+import { useToast } from '@/hooks/use-toast';
 
 type LibraryPageProps = {
     initialFolderId: number | null;
@@ -39,6 +41,7 @@ export default function LibraryIndex() {
     const [createOpen, setCreateOpen] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
     const queryClient = useQueryClient();
+    const { toast } = useToast();
 
     useEffect(() => {
         setCurrentFolderId(initialFolderId);
@@ -84,6 +87,36 @@ export default function LibraryIndex() {
         queryFn: () => fetchFolder(currentFolderId ?? 0),
         enabled: !isRoot && currentFolderId !== null,
     });
+
+    useEffect(() => {
+        if (rootQuery.error && rootQuery.error instanceof HttpError && rootQuery.error.response.status === 401) {
+            toast({
+                title: 'Não autorizado',
+                description: 'Adicione o token de acesso na barra lateral',
+                variant: 'destructive',
+            });
+        }
+    }, [rootQuery.error, toast]);
+
+    useEffect(() => {
+        if (folderChildrenQuery.error && folderChildrenQuery.error instanceof HttpError && folderChildrenQuery.error.response.status === 401) {
+            toast({
+                title: 'Não autorizado',
+                description: 'Adicione o token de acesso na barra lateral',
+                variant: 'destructive',
+            });
+        }
+    }, [folderChildrenQuery.error, toast]);
+
+    useEffect(() => {
+        if (folderDetailQuery.error && folderDetailQuery.error instanceof HttpError && folderDetailQuery.error.response.status === 401) {
+            toast({
+                title: 'Não autorizado',
+                description: 'Adicione o token de acesso na barra lateral',
+                variant: 'destructive',
+            });
+        }
+    }, [folderDetailQuery.error, toast]);
 
     const folders: LibraryFolder[] = useMemo(() => {
         if (isRoot) {
