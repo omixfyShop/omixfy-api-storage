@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem, FolderChildrenResponse, LibraryFolder, LibraryFolderBreadcrumb } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { HttpError } from '@/api/http';
@@ -40,7 +40,6 @@ export default function LibraryIndex() {
     const [page, setPage] = useState(1);
     const [createOpen, setCreateOpen] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
-    const queryClient = useQueryClient();
     const { toast } = useToast();
 
     useEffect(() => {
