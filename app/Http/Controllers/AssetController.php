@@ -304,10 +304,29 @@ class AssetController extends Controller
         }
 
         $disk = $this->disk();
-        $disk->delete($asset->path);
-        $asset->delete();
 
-        return new JsonResponse(['deleted' => true]);
+        try {
+            $pathsToDelete = [$asset->path];
+            $generatedThumbs = $asset->generated_thumbs ?? [];
+
+            if (is_array($generatedThumbs)) {
+                foreach ($generatedThumbs as $thumb) {
+                    if (is_array($thumb) && isset($thumb['path'])) {
+                        $pathsToDelete[] = $thumb['path'];
+                    }
+                }
+            }
+
+            $disk->delete(array_unique($pathsToDelete));
+            $asset->delete();
+
+            return new JsonResponse(['deleted' => true]);
+        } catch (\Throwable $exception) {
+            return new JsonResponse([
+                'message' => 'Failed to delete asset.',
+                'error' => $exception->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**

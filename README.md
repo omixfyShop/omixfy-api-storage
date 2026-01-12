@@ -207,6 +207,21 @@ qualquer verificação de token.
 Todas as rotas ficam sob `/api` e exigem um token válido (veja "Tokens fixos"). Utilize `Authorization: Bearer $TOKEN`,
 `X-AssetsMe-Token: $TOKEN` ou o query param `?token=$TOKEN`, exceto no health check.
 
+## Swagger (API Docs)
+
+O projeto utiliza a biblioteca **L5-Swagger** para expor a documentação da API via interface Swagger UI.
+
+- Acesse em: `http://localhost:8000/api/documentation`
+- O arquivo OpenAPI é servido a partir de `storage/api-docs/swagger.json`
+
+### Autenticação no Swagger
+
+Clique em **Authorize** e informe o token no formato:
+
+```
+Bearer SEU_TOKEN
+```
+
 ### Health check
 
 ```http
