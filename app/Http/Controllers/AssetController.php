@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -435,7 +436,7 @@ class AssetController extends Controller
         $validator = Validator::make(
             $request->all(),
             [
-                'path' => ['required', 'string', 'regex:/^[a-zA-Z0-9_\\.\-/]+$/'],
+                'path' => ['required', 'string', 'regex:/^[a-zA-Z0-9_.\-\/]+$/'],
             ],
             [
                 'path.regex' => 'Path may only contain letters, numbers, dots, slashes, dashes, and underscores.',
@@ -453,10 +454,19 @@ class AssetController extends Controller
             return $this->validationErrorResponse(['path' => ['The path provided is invalid.']]);
         }
 
+        $userId = $request->user()?->id ?? $request->attributes->get('token_user_id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
         $asset = Asset::query()->where('path', $path)->first();
 
         if (! $asset) {
             return new JsonResponse(['message' => 'Asset not found.'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($asset->owner_id !== $userId) {
+            return new JsonResponse(['message' => 'Forbidden.'], Response::HTTP_FORBIDDEN);
         }
 
         $disk = $this->disk();
@@ -473,14 +483,31 @@ class AssetController extends Controller
                 }
             }
 
-            $disk->delete(array_unique($pathsToDelete));
+            $pathsToDelete = array_unique($pathsToDelete);
+            $pathsToDelete = array_filter($pathsToDelete, fn($p) => $p !== null && $p !== '');
+
+            if (!empty($pathsToDelete)) {
+                foreach ($pathsToDelete as $pathToDelete) {
+                    if ($disk->exists($pathToDelete)) {
+                        $disk->delete($pathToDelete);
+                    }
+                }
+            }
+
             $asset->delete();
 
             return new JsonResponse(['deleted' => true]);
         } catch (\Throwable $exception) {
+            \Log::error('Failed to delete asset', [
+                'path' => $path,
+                'asset_id' => $asset->id ?? null,
+                'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
+            ]);
+
             return new JsonResponse([
                 'message' => 'Failed to delete asset.',
-                'error' => $exception->getMessage(),
+                'error' => config('app.debug') ? $exception->getMessage() : 'Server Error',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
