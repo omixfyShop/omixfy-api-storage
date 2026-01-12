@@ -1,0 +1,943 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "AssetsMe API",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000",
+            "description": "Local development server"
+        }
+    ],
+    "paths": {
+        "/api/v1/folders": {
+            "get": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Listar pastas",
+                "description": "Lista as pastas do usuário autenticado",
+                "operationId": "bf7fc98f332879e0350aac8480168599",
+                "parameters": [
+                    {
+                        "name": "parent_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Busca por nome",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "name",
+                                "created_at",
+                                "updated_at"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de pastas"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Criar pasta",
+                "description": "Cria uma nova pasta",
+                "operationId": "ad9f5be0a6a5dbfd5cd4dcb84ea8f87a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "description": "Nome da pasta",
+                                        "type": "string"
+                                    },
+                                    "parent_id": {
+                                        "description": "ID da pasta pai",
+                                        "type": "integer",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Pasta criada com sucesso"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/folders/{folder}": {
+            "get": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Obter pasta",
+                "description": "Retorna os detalhes de uma pasta específica",
+                "operationId": "4527f3706f90f99e00a528b470a89a98",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "path",
+                        "description": "ID da pasta",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Detalhes da pasta"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    },
+                    "404": {
+                        "description": "Pasta não encontrada"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Deletar pasta",
+                "description": "Remove uma pasta (soft delete)",
+                "operationId": "fd29d9133d372b5adce4e00fe4a15ed5",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pasta deletada"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    },
+                    "404": {
+                        "description": "Pasta não encontrada"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Atualizar pasta",
+                "description": "Atualiza o nome de uma pasta",
+                "operationId": "c1a20ea0e9112f099bfaf6fec2f2c260",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "description": "Novo nome da pasta",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Pasta atualizada"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    },
+                    "404": {
+                        "description": "Pasta não encontrada"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/folders/{folder}/move": {
+            "post": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Mover pasta",
+                "description": "Move uma pasta para outra pasta pai",
+                "operationId": "203628b308ad895785d1f1b65ca235ba",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "parent_id": {
+                                        "description": "ID da nova pasta pai (null para raiz)",
+                                        "type": "integer",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Pasta movida com sucesso"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    },
+                    "422": {
+                        "description": "Erro de validação"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/folders/{folder}/restore": {
+            "post": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Restaurar pasta",
+                "description": "Restaura uma pasta deletada",
+                "operationId": "3d113c92b4fb585d7338b5611c657fc2",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pasta restaurada"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    },
+                    "404": {
+                        "description": "Pasta não encontrada"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/folders/{folder}/children": {
+            "get": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Listar filhos da pasta",
+                "description": "Retorna as subpastas e assets de uma pasta",
+                "operationId": "b9a634e0ca8d5ab96b5bca0cf1c04ce9",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "orderBy",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "name",
+                                "created_at",
+                                "updated_at"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de filhos"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    },
+                    "404": {
+                        "description": "Pasta não encontrada"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/folders/{folder}/preview": {
+            "get": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Obter preview da pasta",
+                "description": "Retorna os assets de preview de uma pasta",
+                "operationId": "c820f861e94df24a492d575d8bf42c32",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Assets de preview"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    },
+                    "404": {
+                        "description": "Pasta não encontrada"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/folders/{folder}/tokens": {
+            "post": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Criar token da pasta",
+                "description": "Cria um token de acesso para a pasta",
+                "operationId": "c01b9a262ec2ae950f0ed4ac71807dba",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Token criado com sucesso"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    },
+                    "404": {
+                        "description": "Pasta não encontrada"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/folders/{folder}/assets/{asset}/toggle-preview": {
+            "post": {
+                "tags": [
+                    "Folders"
+                ],
+                "summary": "Alternar preview do asset",
+                "description": "Define ou remove um asset como preview da pasta",
+                "operationId": "3c9e36686fd50b21d94b06bd2bd10b9d",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "asset",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Preview atualizado"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "403": {
+                        "description": "Sem permissão"
+                    },
+                    "404": {
+                        "description": "Pasta ou asset não encontrado"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/health": {
+            "get": {
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Health check",
+                "description": "Health check endpoint.",
+                "operationId": "18ad66ef8a0268ae6a335c7cab057b82",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "ok": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/assets/upload": {
+            "post": {
+                "tags": [
+                    "Assets"
+                ],
+                "summary": "Upload de arquivos",
+                "description": "Upload de um ou mais arquivos para o armazenamento de assets",
+                "operationId": "8d6fd6bed202b9682d9ca4478c02ad7c",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "query",
+                        "description": "Pasta onde o arquivo será armazenado",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9_/\\-]+$"
+                        }
+                    },
+                    {
+                        "name": "small",
+                        "in": "query",
+                        "description": "Tamanho da variante small (1 para padrão ou LARGURAxALTURA)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "medium",
+                        "in": "query",
+                        "description": "Tamanho da variante medium (1 para padrão ou LARGURAxALTURA)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "large",
+                        "in": "query",
+                        "description": "Tamanho da variante large (1 para padrão ou LARGURAxALTURA)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "properties": {
+                                    "file": {
+                                        "description": "Arquivo único",
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "files": {
+                                        "description": "Múltiplos arquivos",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Arquivo(s) enviado(s) com sucesso",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Erro de validação"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "422": {
+                        "description": "Erro ao processar variantes"
+                    },
+                    "500": {
+                        "description": "Erro interno do servidor"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/assets/list": {
+            "get": {
+                "tags": [
+                    "Assets"
+                ],
+                "summary": "Listar assets",
+                "description": "Lista os assets de uma pasta específica ou da raiz",
+                "operationId": "7d6a9ea9abd1d0a22f0859df736ccc9f",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "query",
+                        "description": "Pasta para filtrar os assets",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9_/\\-]+$"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Número da página",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Itens por página (máximo 100)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de assets",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Erro de validação"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/assets/file": {
+            "delete": {
+                "tags": [
+                    "Assets"
+                ],
+                "summary": "Deletar asset",
+                "description": "Remove um asset pelo caminho",
+                "operationId": "24eac637a045f968ca94beef26359416",
+                "parameters": [
+                    {
+                        "name": "path",
+                        "in": "query",
+                        "description": "Caminho do arquivo a ser deletado",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9_\\.\\-/]+$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Asset deletado com sucesso",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "deleted": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Erro de validação"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "404": {
+                        "description": "Asset não encontrado"
+                    },
+                    "500": {
+                        "description": "Erro ao deletar"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/assets/rename": {
+            "patch": {
+                "tags": [
+                    "Assets"
+                ],
+                "summary": "Renomear asset",
+                "description": "Renomeia um asset pelo caminho",
+                "operationId": "a43494f9906cad6426a7ba570435fc35",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "path",
+                                    "name"
+                                ],
+                                "properties": {
+                                    "path": {
+                                        "description": "Caminho atual do arquivo",
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_\\.\\-/]+$"
+                                    },
+                                    "name": {
+                                        "description": "Novo nome do arquivo (sem extensão)",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "pattern": "^[a-zA-Z0-9_\\.\\-]+$"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Asset renomeado com sucesso",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        },
+                                        "url": {
+                                            "type": "string"
+                                        },
+                                        "generated_thumbs": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Erro de validação"
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    },
+                    "404": {
+                        "description": "Asset não encontrado"
+                    },
+                    "500": {
+                        "description": "Erro ao renomear"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Folders",
+            "description": "Folders"
+        },
+        {
+            "name": "Health",
+            "description": "Health"
+        },
+        {
+            "name": "Assets",
+            "description": "Assets"
+        }
+    ]
+}

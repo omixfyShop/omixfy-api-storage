@@ -146,3 +146,14 @@ export async function renameAsset(payload: RenameAssetPayload): Promise<RenameAs
         body: JSON.stringify(payload),
     });
 }
+
+export interface DeleteAssetPayload {
+    path: string;
+}
+
+export async function deleteAsset(payload: DeleteAssetPayload): Promise<{ deleted: boolean }> {
+    const query = new URLSearchParams({ path: payload.path });
+    return request<{ deleted: boolean }>(`/api/assets/file?${query.toString()}`, {
+        method: 'DELETE',
+    });
+}

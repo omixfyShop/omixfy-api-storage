@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
 
 interface ToastOptions {
     title: string;
@@ -20,14 +20,11 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
     const [currentToast, setCurrentToast] = useState<Toast | null>(null);
-    const [toastId, setToastId] = useState(0);
+    const toastIdRef = useRef(0);
 
     const toast = useCallback((options: ToastOptions) => {
-        setToastId((prev) => {
-            const id = prev + 1;
-            setCurrentToast({ ...options, id });
-            return id;
-        });
+        toastIdRef.current += 1;
+        setCurrentToast({ ...options, id: toastIdRef.current });
     }, []);
 
     const closeToast = useCallback(() => {
