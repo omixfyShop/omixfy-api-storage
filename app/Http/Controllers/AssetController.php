@@ -14,10 +14,27 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\Response;
 
 class AssetController extends Controller
 {
+    #[OA\Get(
+        path: "/api/health",
+        summary: "Health check",
+        tags: ["Health"],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "OK",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "ok", type: "boolean")
+                    ]
+                )
+            )
+        ]
+    )]
     /**
      * Health check endpoint.
      */
@@ -26,6 +43,70 @@ class AssetController extends Controller
         return new JsonResponse(['ok' => true], Response::HTTP_OK);
     }
 
+    #[OA\Post(
+        path: "/api/assets/upload",
+        summary: "Upload de arquivos",
+        description: "Upload de um ou mais arquivos para o armazenamento de assets",
+        tags: ["Assets"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(
+                name: "folder",
+                in: "query",
+                required: false,
+                description: "Pasta onde o arquivo será armazenado",
+                schema: new OA\Schema(type: "string", pattern: "^[a-zA-Z0-9_/\\-]+$")
+            ),
+            new OA\Parameter(
+                name: "small",
+                in: "query",
+                required: false,
+                description: "Tamanho da variante small (1 para padrão ou LARGURAxALTURA)",
+                schema: new OA\Schema(type: "string")
+            ),
+            new OA\Parameter(
+                name: "medium",
+                in: "query",
+                required: false,
+                description: "Tamanho da variante medium (1 para padrão ou LARGURAxALTURA)",
+                schema: new OA\Schema(type: "string")
+            ),
+            new OA\Parameter(
+                name: "large",
+                in: "query",
+                required: false,
+                description: "Tamanho da variante large (1 para padrão ou LARGURAxALTURA)",
+                schema: new OA\Schema(type: "string")
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: "multipart/form-data",
+                schema: new OA\Schema(
+                    properties: [
+                        new OA\Property(property: "file", type: "string", format: "binary", description: "Arquivo único"),
+                        new OA\Property(property: "files", type: "array", items: new OA\Items(type: "string", format: "binary"), description: "Múltiplos arquivos"),
+                    ]
+                )
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: "Arquivo(s) enviado(s) com sucesso",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "data", type: "array", items: new OA\Items(type: "object"))
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: "Erro de validação"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 422, description: "Erro ao processar variantes"),
+            new OA\Response(response: 500, description: "Erro interno do servidor"),
+        ]
+    )]
     /**
      * Upload one or more files to the assets storage.
      */
@@ -203,6 +284,50 @@ class AssetController extends Controller
         return new JsonResponse(['data' => $results], Response::HTTP_CREATED);
     }
 
+    #[OA\Get(
+        path: "/api/assets/list",
+        summary: "Listar assets",
+        description: "Lista os assets de uma pasta específica ou da raiz",
+        tags: ["Assets"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(
+                name: "folder",
+                in: "query",
+                required: false,
+                description: "Pasta para filtrar os assets",
+                schema: new OA\Schema(type: "string", pattern: "^[a-zA-Z0-9_/\\-]+$")
+            ),
+            new OA\Parameter(
+                name: "page",
+                in: "query",
+                required: false,
+                description: "Número da página",
+                schema: new OA\Schema(type: "integer", minimum: 1)
+            ),
+            new OA\Parameter(
+                name: "per_page",
+                in: "query",
+                required: false,
+                description: "Itens por página (máximo 100)",
+                schema: new OA\Schema(type: "integer", minimum: 1, maximum: 100)
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Lista de assets",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "data", type: "array", items: new OA\Items(type: "object")),
+                        new OA\Property(property: "meta", type: "object")
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: "Erro de validação"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+        ]
+    )]
     /**
      * List assets for the provided folder.
      */
@@ -271,6 +396,37 @@ class AssetController extends Controller
         ]);
     }
 
+    #[OA\Delete(
+        path: "/api/assets/file",
+        summary: "Deletar asset",
+        description: "Remove um asset pelo caminho",
+        tags: ["Assets"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(
+                name: "path",
+                in: "query",
+                required: true,
+                description: "Caminho do arquivo a ser deletado",
+                schema: new OA\Schema(type: "string", pattern: "^[a-zA-Z0-9_\\.\\-/]+$")
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Asset deletado com sucesso",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "deleted", type: "boolean")
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: "Erro de validação"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 404, description: "Asset não encontrado"),
+            new OA\Response(response: 500, description: "Erro ao deletar"),
+        ]
+    )]
     /**
      * Delete an asset by path.
      */
@@ -329,6 +485,41 @@ class AssetController extends Controller
         }
     }
 
+    #[OA\Patch(
+        path: "/api/assets/rename",
+        summary: "Renomear asset",
+        description: "Renomeia um asset pelo caminho",
+        tags: ["Assets"],
+        security: [["bearerAuth" => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["path", "name"],
+                properties: [
+                    new OA\Property(property: "path", type: "string", pattern: "^[a-zA-Z0-9_\\.\\-/]+$", description: "Caminho atual do arquivo"),
+                    new OA\Property(property: "name", type: "string", maxLength: 255, pattern: "^[a-zA-Z0-9_\\.\\-]+$", description: "Novo nome do arquivo (sem extensão)"),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Asset renomeado com sucesso",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "id", type: "integer"),
+                        new OA\Property(property: "path", type: "string"),
+                        new OA\Property(property: "url", type: "string"),
+                        new OA\Property(property: "generated_thumbs", type: "array", items: new OA\Items(type: "object"))
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: "Erro de validação"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 404, description: "Asset não encontrado"),
+            new OA\Response(response: 500, description: "Erro ao renomear"),
+        ]
+    )]
     /**
      * Rename an asset by path.
      */

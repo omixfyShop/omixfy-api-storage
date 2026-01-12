@@ -24,6 +24,8 @@ return [
             'annotations' => [
                 base_path('app'),
             ],
+            'excludes' => [],
+            'base' => env('L5_SWAGGER_BASE_PATH', null),
         ],
 
         'scanOptions' => [
@@ -42,5 +44,21 @@ return [
         'operations_sort' => null,
         'validator_url' => null,
         'constants' => [],
+        'securityDefinitions' => [
+            'securitySchemes' => [],
+        ],
+        'ui' => [
+            'display' => [
+                'dark_mode' => false,
+                'doc_expansion' => 'none',
+                'filter' => true,
+            ],
+            'authorization' => [
+                'persist_authorization' => false,
+                'oauth2' => [
+                    'use_pkce_with_authorization_code_grant' => false,
+                ],
+            ],
+        ],
     ],
 ];

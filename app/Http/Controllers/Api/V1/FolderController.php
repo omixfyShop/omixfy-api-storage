@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use OpenApi\Attributes as OA;
 
 class FolderController extends Controller
 {
@@ -27,6 +28,25 @@ class FolderController extends Controller
     {
         return $request->user()?->id ?? $request->attributes->get('token_user_id');
     }
+
+    #[OA\Get(
+        path: "/api/v1/folders",
+        summary: "Listar pastas",
+        description: "Lista as pastas do usuário autenticado",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "parent_id", in: "query", required: false, schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "q", in: "query", required: false, schema: new OA\Schema(type: "string"), description: "Busca por nome"),
+            new OA\Parameter(name: "per_page", in: "query", required: false, schema: new OA\Schema(type: "integer", minimum: 1, maximum: 100)),
+            new OA\Parameter(name: "orderBy", in: "query", required: false, schema: new OA\Schema(type: "string", enum: ["name", "created_at", "updated_at"])),
+            new OA\Parameter(name: "order", in: "query", required: false, schema: new OA\Schema(type: "string", enum: ["asc", "desc"])),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Lista de pastas"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+        ]
+    )]
     public function index(Request $request): JsonResponse
     {
         $userId = $this->getUserId($request);
@@ -58,6 +78,28 @@ class FolderController extends Controller
         return FolderResource::collection($folders)->response();
     }
 
+    #[OA\Post(
+        path: "/api/v1/folders",
+        summary: "Criar pasta",
+        description: "Cria uma nova pasta",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["name"],
+                properties: [
+                    new OA\Property(property: "name", type: "string", description: "Nome da pasta"),
+                    new OA\Property(property: "parent_id", type: "integer", nullable: true, description: "ID da pasta pai"),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: "Pasta criada com sucesso"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+        ]
+    )]
     public function store(StoreFolderRequest $request): JsonResponse
     {
         $userId = $this->getUserId($request);
@@ -93,6 +135,22 @@ class FolderController extends Controller
         return (new FolderResource($folder))->response()->setStatusCode(201);
     }
 
+    #[OA\Get(
+        path: "/api/v1/folders/{folder}",
+        summary: "Obter pasta",
+        description: "Retorna os detalhes de uma pasta específica",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "folder", in: "path", required: true, schema: new OA\Schema(type: "integer"), description: "ID da pasta"),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Detalhes da pasta"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+            new OA\Response(response: 404, description: "Pasta não encontrada"),
+        ]
+    )]
     public function show(Request $request, Folder $folder): JsonResponse
     {
         $this->authorize('view', $folder);
@@ -108,6 +166,31 @@ class FolderController extends Controller
         return (new FolderResource($folder))->response();
     }
 
+    #[OA\Patch(
+        path: "/api/v1/folders/{folder}",
+        summary: "Atualizar pasta",
+        description: "Atualiza o nome de uma pasta",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "folder", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["name"],
+                properties: [
+                    new OA\Property(property: "name", type: "string", description: "Novo nome da pasta"),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: "Pasta atualizada"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+            new OA\Response(response: 404, description: "Pasta não encontrada"),
+        ]
+    )]
     public function update(UpdateFolderRequest $request, Folder $folder): JsonResponse
     {
         $this->authorize('update', $folder);
@@ -127,6 +210,30 @@ class FolderController extends Controller
         return (new FolderResource($folder->refresh()))->response();
     }
 
+    #[OA\Post(
+        path: "/api/v1/folders/{folder}/move",
+        summary: "Mover pasta",
+        description: "Move uma pasta para outra pasta pai",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "folder", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: "parent_id", type: "integer", nullable: true, description: "ID da nova pasta pai (null para raiz)"),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: "Pasta movida com sucesso"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+            new OA\Response(response: 422, description: "Erro de validação"),
+        ]
+    )]
     public function move(MoveFolderRequest $request, Folder $folder): JsonResponse
     {
         $this->authorize('update', $folder);
@@ -155,6 +262,22 @@ class FolderController extends Controller
         return (new FolderResource($folder->refresh()))->response();
     }
 
+    #[OA\Delete(
+        path: "/api/v1/folders/{folder}",
+        summary: "Deletar pasta",
+        description: "Remove uma pasta (soft delete)",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "folder", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Pasta deletada"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+            new OA\Response(response: 404, description: "Pasta não encontrada"),
+        ]
+    )]
     public function destroy(Request $request, Folder $folder): JsonResponse
     {
         $this->authorize('delete', $folder);
@@ -169,6 +292,22 @@ class FolderController extends Controller
         return response()->json(['status' => 'deleted']);
     }
 
+    #[OA\Post(
+        path: "/api/v1/folders/{folder}/restore",
+        summary: "Restaurar pasta",
+        description: "Restaura uma pasta deletada",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "folder", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Pasta restaurada"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+            new OA\Response(response: 404, description: "Pasta não encontrada"),
+        ]
+    )]
     public function restore(Request $request, int $folderId): JsonResponse
     {
         $folder = Folder::withTrashed()->findOrFail($folderId);
@@ -188,6 +327,25 @@ class FolderController extends Controller
         return (new FolderResource($folder->refresh()))->response();
     }
 
+    #[OA\Get(
+        path: "/api/v1/folders/{folder}/children",
+        summary: "Listar filhos da pasta",
+        description: "Retorna as subpastas e assets de uma pasta",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "folder", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "per_page", in: "query", required: false, schema: new OA\Schema(type: "integer", minimum: 1, maximum: 100)),
+            new OA\Parameter(name: "orderBy", in: "query", required: false, schema: new OA\Schema(type: "string", enum: ["name", "created_at", "updated_at"])),
+            new OA\Parameter(name: "order", in: "query", required: false, schema: new OA\Schema(type: "string", enum: ["asc", "desc"])),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Lista de filhos"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+            new OA\Response(response: 404, description: "Pasta não encontrada"),
+        ]
+    )]
     public function children(Request $request, Folder $folder): JsonResponse
     {
         $this->authorize('view', $folder);
@@ -218,6 +376,22 @@ class FolderController extends Controller
         ]);
     }
 
+    #[OA\Get(
+        path: "/api/v1/folders/{folder}/preview",
+        summary: "Obter preview da pasta",
+        description: "Retorna os assets de preview de uma pasta",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "folder", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Assets de preview"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+            new OA\Response(response: 404, description: "Pasta não encontrada"),
+        ]
+    )]
     public function preview(Request $request, Folder $folder): JsonResponse
     {
         $this->authorize('view', $folder);
@@ -237,6 +411,22 @@ class FolderController extends Controller
         return AssetResource::collection($assets)->response();
     }
 
+    #[OA\Post(
+        path: "/api/v1/folders/{folder}/tokens",
+        summary: "Criar token da pasta",
+        description: "Cria um token de acesso para a pasta",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "folder", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+        ],
+        responses: [
+            new OA\Response(response: 201, description: "Token criado com sucesso"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+            new OA\Response(response: 404, description: "Pasta não encontrada"),
+        ]
+    )]
     public function createToken(Request $request, Folder $folder): JsonResponse
     {
         $this->authorize('update', $folder);
@@ -264,6 +454,23 @@ class FolderController extends Controller
         ], 201);
     }
 
+    #[OA\Post(
+        path: "/api/v1/folders/{folder}/assets/{asset}/toggle-preview",
+        summary: "Alternar preview do asset",
+        description: "Define ou remove um asset como preview da pasta",
+        tags: ["Folders"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "folder", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "asset", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Preview atualizado"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 403, description: "Sem permissão"),
+            new OA\Response(response: 404, description: "Pasta ou asset não encontrado"),
+        ]
+    )]
     public function togglePreview(Request $request, Folder $folder, Asset $asset): JsonResponse
     {
         $this->authorize('update', $folder);

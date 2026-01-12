@@ -211,16 +211,39 @@ Todas as rotas ficam sob `/api` e exigem um token válido (veja "Tokens fixos").
 
 O projeto utiliza a biblioteca **L5-Swagger** para expor a documentação da API via interface Swagger UI.
 
-- Acesse em: `http://localhost:8000/api/documentation`
-- O arquivo OpenAPI é servido a partir de `storage/api-docs/swagger.json`
+### Acessando o Swagger
+
+1. **URL de acesso:**
+   - Ambiente local: `http://localhost:8000/api/documentation`
+   - O arquivo OpenAPI é gerado automaticamente em `storage/api-docs/swagger.json`
+
+2. **Gerar/Atualizar a documentação:**
+   ```bash
+   php artisan l5-swagger:generate
+   ```
+   Execute este comando sempre que adicionar ou modificar endpoints na API para atualizar a documentação.
+
+3. **Acessar a interface:**
+   - Abra o navegador e acesse `http://localhost:8000/api/documentation`
+   - A interface Swagger UI será carregada automaticamente com todos os endpoints documentados
 
 ### Autenticação no Swagger
 
-Clique em **Authorize** e informe o token no formato:
+Para testar endpoints que exigem autenticação:
 
-```
-Bearer SEU_TOKEN
-```
+1. Clique no botão **Authorize** no topo da página do Swagger
+2. No campo de autenticação, informe o token no formato:
+   ```
+   Bearer SEU_TOKEN
+   ```
+   Ou apenas:
+   ```
+   SEU_TOKEN
+   ```
+3. Clique em **Authorize** e depois em **Close**
+4. Agora você pode testar os endpoints diretamente pela interface do Swagger
+
+**Nota:** O endpoint `/api/health` não requer autenticação e pode ser testado sem token.
 
 ### Health check
 
