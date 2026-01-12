@@ -9,6 +9,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { RenameAssetDialog } from './rename-asset-dialog';
+import { DeleteAssetDialog } from './delete-asset-dialog';
 
 const root = (import.meta.env.VITE_API_URL as string | undefined) ?? window.location.origin;
 const assetsBase = `${root}/assets/`;
@@ -76,6 +77,7 @@ export function AssetsList({ assets, folderId, previewAssetIds = [] }: AssetsLis
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [renameAsset, setRenameAsset] = useState<LibraryAsset | null>(null);
+    const [deleteAsset, setDeleteAsset] = useState<LibraryAsset | null>(null);
 
     const togglePreviewMutation = useMutation({
         mutationFn: async ({ assetId }: { assetId: number | string }) => {
@@ -155,7 +157,7 @@ export function AssetsList({ assets, folderId, previewAssetIds = [] }: AssetsLis
                                                 <Pencil className="h-4 w-4 mr-2" />
                                                 Renomear
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem disabled className="text-muted-foreground">
+                                            <DropdownMenuItem onClick={() => setDeleteAsset(asset)} className="text-red-600">
                                                 <Trash2 className="h-4 w-4 mr-2" />
                                                 Deletar
                                             </DropdownMenuItem>
@@ -217,6 +219,13 @@ export function AssetsList({ assets, folderId, previewAssetIds = [] }: AssetsLis
                     asset={renameAsset}
                     open={!!renameAsset}
                     onOpenChange={(open) => !open && setRenameAsset(null)}
+                />
+            )}
+            {deleteAsset && (
+                <DeleteAssetDialog
+                    asset={deleteAsset}
+                    open={!!deleteAsset}
+                    onOpenChange={(open) => !open && setDeleteAsset(null)}
                 />
             )}
         </div>
