@@ -32,6 +32,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::resource('tokens', TokenController::class)->only(['index', 'store', 'destroy']);
 
+    Route::get('help', function () {
+        return Inertia::render('help/index');
+    })->name('help');
+
     Route::get('admin/users', UsersPageController::class)->name('admin.users.index');
 });
 

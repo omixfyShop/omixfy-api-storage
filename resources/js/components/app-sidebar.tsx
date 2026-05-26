@@ -15,7 +15,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { CloudUpload, KeyRound, LayoutGrid, List, Users } from 'lucide-react';
+import { CloudUpload, HelpCircle, KeyRound, LayoutGrid, List, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const baseNavItems: NavItem[] = [
@@ -44,7 +44,11 @@ const baseNavItems: NavItem[] = [
         href: '/tokens',
         icon: KeyRound,
     },
-
+    {
+        title: 'Ajuda',
+        href: '/help',
+        icon: HelpCircle,
+    },
 ];
 
 const footerNavItems: NavItem[] = [
