@@ -38,6 +38,7 @@ export default function LibraryIndex() {
     const [orderBy, setOrderBy] = useState<OrderField>('name');
     const [order, setOrder] = useState<OrderDirection>('asc');
     const [page, setPage] = useState(1);
+    const [assetsPage, setAssetsPage] = useState(1);
     const [createOpen, setCreateOpen] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
     const { toast } = useToast();
@@ -45,6 +46,7 @@ export default function LibraryIndex() {
     useEffect(() => {
         setCurrentFolderId(initialFolderId);
         setPage(1);
+        setAssetsPage(1);
     }, [initialFolderId]);
 
     useEffect(() => {
@@ -69,7 +71,7 @@ export default function LibraryIndex() {
     });
 
     const folderChildrenQuery = useQuery({
-        queryKey: ['library', 'folder-children', { folderId: currentFolderId, orderBy, order, search: debouncedSearch, page }],
+        queryKey: ['library', 'folder-children', { folderId: currentFolderId, orderBy, order, search: debouncedSearch, page, assetsPage }],
         queryFn: () =>
             fetchFolderChildren(currentFolderId ?? 0, {
                 orderBy,
@@ -77,6 +79,7 @@ export default function LibraryIndex() {
                 q: debouncedSearch || undefined,
                 page,
                 per_page: PER_PAGE,
+                assets_page: assetsPage,
             }),
         enabled: !isRoot && currentFolderId !== null,
     });
@@ -142,6 +145,14 @@ export default function LibraryIndex() {
         return folderChildrenQuery.data?.folders.meta;
     }, [isRoot, rootQuery.data, folderChildrenQuery.data]);
 
+    const assetsMeta = useMemo(() => {
+        if (isRoot) {
+            return undefined;
+        }
+
+        return folderChildrenQuery.data?.assets.meta;
+    }, [isRoot, folderChildrenQuery.data]);
+
     const breadcrumbs = useMemo(() => {
         if (isRoot) {
             return baseBreadcrumbs;
@@ -168,6 +179,9 @@ export default function LibraryIndex() {
     const hasPrev = (foldersMeta?.current_page ?? 1) > 1;
     const hasNext = (foldersMeta?.last_page ?? 1) > (foldersMeta?.current_page ?? 1);
 
+    const hasAssetsPrev = (assetsMeta?.current_page ?? 1) > 1;
+    const hasAssetsNext = (assetsMeta?.last_page ?? 1) > (assetsMeta?.current_page ?? 1);
+
     const currentFolder = folderDetailQuery.data?.data;
 
     return (
@@ -182,16 +196,19 @@ export default function LibraryIndex() {
                 onSearchChange={(value) => {
                     setSearch(value);
                     setPage(1);
+                    setAssetsPage(1);
                 }}
                 orderBy={orderBy}
                 order={order}
                 onOrderByChange={(value) => {
                     setOrderBy(value);
                     setPage(1);
+                    setAssetsPage(1);
                 }}
                 onOrderChange={(value) => {
                     setOrder(value);
                     setPage(1);
+                    setAssetsPage(1);
                 }}
                 actionSlot={
                     !isRoot && currentFolderId ? (
@@ -213,16 +230,42 @@ export default function LibraryIndex() {
                     }
                 />
 
-                <AssetsList 
-                    assets={assets} 
+                <AssetsList
+                    assets={assets}
                     folderId={currentFolderId}
                     previewAssetIds={currentFolder?.preview_asset_ids ?? []}
                 />
 
-                {foldersMeta ? (
+                {assetsMeta && (assetsMeta.last_page ?? 1) > 1 ? (
                     <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
                         <span>
-                            Página {foldersMeta.current_page} de {foldersMeta.last_page ?? foldersMeta.current_page}
+                            Arquivos — Página {assetsMeta.current_page} de {assetsMeta.last_page ?? assetsMeta.current_page}
+                        </span>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                className="rounded-md border border-input px-3 py-1 disabled:opacity-50"
+                                onClick={() => setAssetsPage((prev) => Math.max(prev - 1, 1))}
+                                disabled={!hasAssetsPrev}
+                            >
+                                Anterior
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-md border border-input px-3 py-1 disabled:opacity-50"
+                                onClick={() => setAssetsPage((prev) => prev + 1)}
+                                disabled={!hasAssetsNext}
+                            >
+                                Próxima
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
+
+                {foldersMeta && (foldersMeta.last_page ?? 1) > 1 ? (
+                    <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
+                        <span>
+                            Pastas — Página {foldersMeta.current_page} de {foldersMeta.last_page ?? foldersMeta.current_page}
                         </span>
                         <div className="flex gap-2">
                             <button

@@ -16,6 +16,7 @@ interface ListFoldersParams {
     order?: OrderDirection;
     page?: number;
     per_page?: number;
+    assets_page?: number;
 }
 
 interface CreateFolderPayload {
@@ -59,6 +60,8 @@ export async function fetchFolderChildren(folderId: number, params: ListFoldersP
 
         if (key === 'page') {
             query.set('folders_page', String(value));
+        } else if (key === 'assets_page') {
+            query.set('assets_page', String(value));
         } else {
             query.set(key, String(value));
         }
