@@ -2,24 +2,28 @@
 
 namespace App\Http\Controllers;
 
-use App\Features\Convert\ImageResize;
-use App\Models\Asset;
-use App\Models\Folder;
-use Illuminate\Filesystem\FilesystemAdapter;
+use App\Services\Asset\AssetDeleteService;
+use App\Services\Asset\AssetListService;
+use App\Services\Asset\AssetRenameService;
+use App\Services\Asset\AssetService;
+use App\Services\Asset\AssetUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Pagination\Paginator;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
-use InvalidArgumentException;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\Response;
 
 class AssetController extends Controller
 {
+    public function __construct(
+        private readonly AssetService $assetService,
+        private readonly AssetUploadService $uploadService,
+        private readonly AssetListService $listService,
+        private readonly AssetDeleteService $deleteService,
+        private readonly AssetRenameService $renameService,
+    ) {
+    }
+
     #[OA\Get(
         path: "/api/health",
         summary: "Health check",
@@ -36,9 +40,6 @@ class AssetController extends Controller
             )
         ]
     )]
-    /**
-     * Health check endpoint.
-     */
     public function health(): JsonResponse
     {
         return new JsonResponse(['ok' => true], Response::HTTP_OK);
@@ -108,9 +109,6 @@ class AssetController extends Controller
             new OA\Response(response: 500, description: "Erro interno do servidor"),
         ]
     )]
-    /**
-     * Upload one or more files to the assets storage.
-     */
     public function upload(Request $request): JsonResponse
     {
         $maxFileSize = (int) config('assetsme.max_file_size', 10 * 1024 * 1024);
@@ -120,9 +118,9 @@ class AssetController extends Controller
             $request->all(),
             [
                 'folder' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\\/\-]+$/'],
-                'file' => ['nullable', 'file', 'max:'.$maxKilobytes],
+                'file' => ['nullable', 'file', 'max:' . $maxKilobytes],
                 'files' => ['nullable', 'array'],
-                'files.*' => ['file', 'max:'.$maxKilobytes],
+                'files.*' => ['file', 'max:' . $maxKilobytes],
             ],
             [
                 'folder.regex' => 'Folder may only contain letters, numbers, slashes, dashes, and underscores.',
@@ -130,159 +128,10 @@ class AssetController extends Controller
         );
 
         if ($validator->fails()) {
-            return $this->validationErrorResponse($validator->errors()->toArray());
+            return $this->assetService->validationErrorResponse($validator->errors()->toArray());
         }
 
-        $validated = $validator->validated();
-        $folder = $this->normalizeFolder($validated['folder'] ?? null);
-
-        // Get user ID for folder resolution
-        $userId = $request->user()?->id ?? $request->attributes->get('token_user_id');
-        if (!$userId) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        // Resolve folder ID from folder path
-        $folderId = $this->resolveFolderId($folder, $userId);
-
-        $uploadedFiles = [];
-        $singleFile = $request->file('file');
-        if ($singleFile instanceof UploadedFile) {
-            $uploadedFiles[] = $singleFile;
-        }
-
-        $multipleFiles = $request->file('files', []);
-        if (! is_array($multipleFiles)) {
-            $multipleFiles = [$multipleFiles];
-        }
-
-        foreach ($multipleFiles as $file) {
-            if ($file instanceof UploadedFile) {
-                $uploadedFiles[] = $file;
-            }
-        }
-
-        if ($uploadedFiles === []) {
-            return $this->validationErrorResponse([
-                'file' => ['No file was provided.'],
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        $disk = $this->disk();
-        $imageResize = new ImageResize($disk);
-
-        $variantDefinitions = [];
-        $variantErrors = [];
-
-        foreach (['small', 'medium', 'large'] as $variantKey) {
-            try {
-                $variantDefinitions[$variantKey] = $imageResize->resolveVariantSize($request->query($variantKey), $variantKey);
-            } catch (InvalidArgumentException $exception) {
-                $variantErrors[$variantKey] = [$exception->getMessage()];
-            }
-        }
-
-        if ($variantErrors !== []) {
-            return $this->validationErrorResponse($variantErrors, Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        $results = [];
-
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-
-        foreach ($uploadedFiles as $file) {
-            if (! $file->isValid()) {
-                return $this->validationErrorResponse(['files' => ['One or more files are invalid.']]);
-            }
-
-            if ($file->getSize() > $maxFileSize) {
-                return $this->validationErrorResponse(['files' => ['One or more files exceed the maximum size.']]);
-            }
-
-            $detectedMime = $finfo->file($file->getRealPath());
-
-            if ($detectedMime === false) {
-                return $this->validationErrorResponse(['files' => ['Unable to detect file MIME type.']]);
-            }
-
-            if ($this->isForbiddenMime($detectedMime)) {
-                return $this->validationErrorResponse(['files' => ['The provided file type is not allowed.']]);
-            }
-
-            $originalName = $file->getClientOriginalName();
-
-            $fileName = $this->buildFileName($file, $detectedMime);
-            $relativePath = ltrim(($folder ? $folder.'/' : '').$fileName, '/');
-
-            while ($disk->exists($relativePath)) {
-                usleep(1000);
-                $fileName = $this->buildFileName($file, $detectedMime);
-                $relativePath = ltrim(($folder ? $folder.'/' : '').$fileName, '/');
-            }
-
-            $storedPath = $disk->putFileAs($folder ?? '', $file, $fileName);
-
-            if ($storedPath === false) {
-                return new JsonResponse([
-                    'message' => 'Failed to store uploaded file.',
-                ], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
-
-            $asset = Asset::create([
-                'path' => $relativePath,
-                'folder_id' => $folderId,
-                'folder' => $folder,
-                'owner_id' => $userId,
-                'original_name' => $originalName,
-                'mime' => $detectedMime,
-                'size' => $file->getSize(),
-                'checksum' => hash_file('sha256', $file->getRealPath()),
-                'uploaded_by' => $userId,
-            ]);
-
-            $sizes = [];
-            $variantMetadata = [];
-
-            try {
-                $variantResult = $imageResize->generateVariantData($relativePath, $folder, $fileName, $variantDefinitions);
-                $sizes = $variantResult['urls'];
-                $variantMetadata = $variantResult['metadata'];
-            } catch (\Throwable $exception) {
-                return new JsonResponse([
-                    'message' => 'Failed to generate one or more image variants.',
-                ], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
-
-            if ($variantMetadata !== []) {
-                $asset->generated_thumbs = $variantMetadata;
-                $asset->save();
-            }
-
-            $result = [
-                'id' => $asset->id,
-                'url' => $disk->url($relativePath),
-                'path' => $asset->path,
-                'folder_id' => $asset->folder_id,
-                'folder' => $asset->folder,
-                'mime' => $asset->mime,
-                'size' => $asset->size,
-                'original_name' => $asset->original_name,
-                'checksum' => $asset->checksum,
-                'created_at' => $asset->created_at,
-            ];
-
-            if ($sizes !== []) {
-                $result['sizes'] = $sizes;
-            }
-
-            if ($variantMetadata !== []) {
-                $result['generated_thumbs'] = $variantMetadata;
-            }
-
-            $results[] = $result;
-        }
-
-        return new JsonResponse(['data' => $results], Response::HTTP_CREATED);
+        return $this->uploadService->handle($request);
     }
 
     #[OA\Get(
@@ -329,9 +178,6 @@ class AssetController extends Controller
             new OA\Response(response: 401, description: "Não autorizado"),
         ]
     )]
-    /**
-     * List assets for the provided folder.
-     */
     public function list(Request $request): JsonResponse
     {
         $validator = Validator::make(
@@ -347,54 +193,17 @@ class AssetController extends Controller
         );
 
         if ($validator->fails()) {
-            return $this->validationErrorResponse($validator->errors()->toArray());
+            return $this->assetService->validationErrorResponse($validator->errors()->toArray());
         }
 
         $validated = $validator->validated();
-        $folder = $this->normalizeFolder($validated['folder'] ?? null);
-        $page = (int) ($validated['page'] ?? 1);
-        $perPage = (int) ($validated['per_page'] ?? 25);
 
-        Paginator::currentPageResolver(static fn () => $page);
-
-        $query = Asset::query()->orderByDesc('created_at');
-
-        if ($folder !== null) {
-            $query->where('folder', $folder);
-        } else {
-            $query->where(function ($query) {
-                $query->whereNull('folder')->orWhere('folder', '');
-            });
-        }
-
-        $paginator = $query->simplePaginate($perPage);
-        $disk = $this->disk();
-
-        $items = collect($paginator->items())->map(function (Asset $asset) use ($disk) {
-            return [
-                'id' => $asset->id,
-                'path' => $asset->path,
-                'folder' => $asset->folder,
-                'original_name' => $asset->original_name,
-                'mime' => $asset->mime,
-                'size' => $asset->size,
-                'checksum' => $asset->checksum,
-                'uploaded_by' => $asset->uploaded_by,
-                'created_at' => $asset->created_at,
-                'updated_at' => $asset->updated_at,
-                'url' => $disk->url($asset->path),
-            ];
-        })->values();
-
-        return new JsonResponse([
-            'data' => $items,
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'next_page_url' => $paginator->nextPageUrl(),
-                'prev_page_url' => $paginator->previousPageUrl(),
-            ],
-        ]);
+        return $this->listService->handle(
+            $request,
+            $validated['folder'] ?? null,
+            (int) ($validated['page'] ?? 1),
+            (int) ($validated['per_page'] ?? 25),
+        );
     }
 
     #[OA\Delete(
@@ -428,9 +237,6 @@ class AssetController extends Controller
             new OA\Response(response: 500, description: "Erro ao deletar"),
         ]
     )]
-    /**
-     * Delete an asset by path.
-     */
     public function delete(Request $request): JsonResponse
     {
         $validator = Validator::make(
@@ -444,72 +250,12 @@ class AssetController extends Controller
         );
 
         if ($validator->fails()) {
-            return $this->validationErrorResponse($validator->errors()->toArray());
+            return $this->assetService->validationErrorResponse($validator->errors()->toArray());
         }
 
         $validated = $validator->validated();
-        $path = $this->normalizePath($validated['path']);
 
-        if ($path === null) {
-            return $this->validationErrorResponse(['path' => ['The path provided is invalid.']]);
-        }
-
-        $userId = $request->user()?->id ?? $request->attributes->get('token_user_id');
-        if (!$userId) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        $asset = Asset::query()->where('path', $path)->first();
-
-        if (! $asset) {
-            return new JsonResponse(['message' => 'Asset not found.'], Response::HTTP_NOT_FOUND);
-        }
-
-        if ($asset->owner_id !== $userId) {
-            return new JsonResponse(['message' => 'Forbidden.'], Response::HTTP_FORBIDDEN);
-        }
-
-        $disk = $this->disk();
-
-        try {
-            $pathsToDelete = [$asset->path];
-            $generatedThumbs = $asset->generated_thumbs ?? [];
-
-            if (is_array($generatedThumbs)) {
-                foreach ($generatedThumbs as $thumb) {
-                    if (is_array($thumb) && isset($thumb['path'])) {
-                        $pathsToDelete[] = $thumb['path'];
-                    }
-                }
-            }
-
-            $pathsToDelete = array_unique($pathsToDelete);
-            $pathsToDelete = array_filter($pathsToDelete, fn($p) => $p !== null && $p !== '');
-
-            if (!empty($pathsToDelete)) {
-                foreach ($pathsToDelete as $pathToDelete) {
-                    if ($disk->exists($pathToDelete)) {
-                        $disk->delete($pathToDelete);
-                    }
-                }
-            }
-
-            $asset->delete();
-
-            return new JsonResponse(['deleted' => true]);
-        } catch (\Throwable $exception) {
-            \Log::error('Failed to delete asset', [
-                'path' => $path,
-                'asset_id' => $asset->id ?? null,
-                'error' => $exception->getMessage(),
-                'trace' => $exception->getTraceAsString(),
-            ]);
-
-            return new JsonResponse([
-                'message' => 'Failed to delete asset.',
-                'error' => config('app.debug') ? $exception->getMessage() : 'Server Error',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return $this->deleteService->handle($request, $validated['path']);
     }
 
     #[OA\Patch(
@@ -547,9 +293,6 @@ class AssetController extends Controller
             new OA\Response(response: 500, description: "Erro ao renomear"),
         ]
     )]
-    /**
-     * Rename an asset by path.
-     */
     public function rename(Request $request): JsonResponse
     {
         $validator = Validator::make(
@@ -565,254 +308,11 @@ class AssetController extends Controller
         );
 
         if ($validator->fails()) {
-            return $this->validationErrorResponse($validator->errors()->toArray());
+            return $this->assetService->validationErrorResponse($validator->errors()->toArray());
         }
 
         $validated = $validator->validated();
-        $path = $this->normalizePath($validated['path']);
 
-        if ($path === null) {
-            return $this->validationErrorResponse(['path' => ['The path provided is invalid.']]);
-        }
-
-        $asset = Asset::query()->where('path', $path)->first();
-
-        if (! $asset) {
-            return new JsonResponse(['message' => 'Asset not found.'], Response::HTTP_NOT_FOUND);
-        }
-
-        $disk = $this->disk();
-        $oldPath = $asset->path;
-        $oldDir = dirname($oldPath);
-        $oldFileName = basename($oldPath);
-        $oldBaseName = pathinfo($oldFileName, PATHINFO_FILENAME);
-        $extension = pathinfo($oldFileName, PATHINFO_EXTENSION);
-
-        $newName = trim($validated['name']);
-        $newFileName = $extension ? "{$newName}.{$extension}" : $newName;
-        $newPath = $oldDir !== '.' ? "{$oldDir}/{$newFileName}" : $newFileName;
-
-        if ($disk->exists($newPath) && $newPath !== $oldPath) {
-            $datetime = now()->format('YmdHis');
-            $newFileName = $extension ? "{$newName}-{$datetime}.{$extension}" : "{$newName}-{$datetime}";
-            $newPath = $oldDir !== '.' ? "{$oldDir}/{$newFileName}" : $newFileName;
-        }
-
-        try {
-            $disk->move($oldPath, $newPath);
-
-            $updatedThumbs = [];
-            if ($asset->generated_thumbs && is_array($asset->generated_thumbs)) {
-                foreach ($asset->generated_thumbs as $thumbKey => $thumbData) {
-                    if (!isset($thumbData['path'])) {
-                        $updatedThumbs[$thumbKey] = $thumbData;
-                        continue;
-                    }
-
-                    $oldThumbPath = $thumbData['path'];
-                    $thumbDir = dirname($oldThumbPath);
-
-                    $oldThumbFileName = basename($oldThumbPath);
-                    $oldThumbBaseName = pathinfo($oldThumbFileName, PATHINFO_FILENAME);
-                    $thumbExtension = pathinfo($oldThumbFileName, PATHINFO_EXTENSION);
-
-                    if (str_contains($oldThumbBaseName, '--')) {
-                        $parts = explode('--', $oldThumbBaseName, 2);
-                        $variantSuffix = $parts[1] ?? '';
-                        $newThumbBaseName = "{$newName}--{$variantSuffix}";
-                    } elseif (preg_match('/^' . preg_quote($oldBaseName, '/') . '_(\d+)$/', $oldThumbBaseName, $matches)) {
-                        $variantSuffix = $matches[1];
-                        $newThumbBaseName = "{$newName}_{$variantSuffix}";
-                    } elseif (str_starts_with($oldThumbBaseName, $oldBaseName)) {
-                        $suffix = substr($oldThumbBaseName, strlen($oldBaseName));
-                        $newThumbBaseName = "{$newName}{$suffix}";
-                    } else {
-                        $newThumbBaseName = $newName;
-                    }
-
-                    $newThumbFileName = $thumbExtension ? "{$newThumbBaseName}.{$thumbExtension}" : $newThumbBaseName;
-                    $newThumbPath = $thumbDir !== '.' ? "{$thumbDir}/{$newThumbFileName}" : $newThumbFileName;
-
-                    if ($disk->exists($oldThumbPath)) {
-                        $disk->move($oldThumbPath, $newThumbPath);
-                    }
-
-                    $updatedThumbs[$thumbKey] = array_merge($thumbData, [
-                        'path' => $newThumbPath,
-                        'url' => $disk->url($newThumbPath),
-                    ]);
-                }
-            }
-
-            $asset->path = $newPath;
-            if (!empty($updatedThumbs)) {
-                $asset->generated_thumbs = $updatedThumbs;
-            }
-            $asset->save();
-
-            return new JsonResponse([
-                'id' => $asset->id,
-                'path' => $asset->path,
-                'url' => $disk->url($asset->path),
-                'generated_thumbs' => $asset->generated_thumbs ?? [],
-            ], Response::HTTP_OK);
-        } catch (\Throwable $exception) {
-            return new JsonResponse([
-                'message' => 'Failed to rename asset.',
-                'error' => $exception->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Normalize a folder string.
-     */
-    private function normalizeFolder(?string $folder): ?string
-    {
-        if ($folder === null) {
-            return null;
-        }
-
-        $folder = trim($folder);
-        $folder = trim($folder, '/');
-
-        if ($folder === '') {
-            return null;
-        }
-
-        return $folder;
-    }
-
-    /**
-     * Normalize a path and guard against directory traversal.
-     */
-    private function normalizePath(string $path): ?string
-    {
-        $normalized = trim($path);
-        $normalized = ltrim($normalized, '/');
-
-        if ($normalized === '' || str_contains($normalized, '..')) {
-            return null;
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * Determine if the provided MIME type is disallowed.
-     */
-    private function isForbiddenMime(string $mime): bool
-    {
-        return str_contains($mime, 'php') || str_starts_with($mime, 'text/x-php');
-    }
-
-    /**
-     * Guess a file extension from the detected MIME type.
-     */
-    private function extensionFromMime(string $mime): ?string
-    {
-        $map = [
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            'image/avif' => 'avif',
-            'image/svg+xml' => 'svg',
-            'application/pdf' => 'pdf',
-            'text/plain' => 'txt',
-        ];
-
-        return $map[$mime] ?? null;
-    }
-
-    /**
-     * Build the filename for the original upload using slug + timestamp + extension.
-     */
-    private function buildFileName(UploadedFile $file, ?string $detectedMime = null): string
-    {
-        $originalName = $file->getClientOriginalName();
-        $baseName = Str::slug(pathinfo($originalName, PATHINFO_FILENAME));
-
-        if ($baseName === '') {
-            $baseName = 'asset';
-        }
-
-        $extension = strtolower($file->getClientOriginalExtension() ?: '');
-        $extension = preg_replace('/[^a-z0-9]/i', '', $extension);
-
-        if ($extension === '') {
-            $extension = $this->extensionFromMime($detectedMime ?? $file->getMimeType()) ?? 'bin';
-        }
-
-        $timestamp = now()->format('YmdHisv'); // microsecond precision guards against collisions
-
-        return sprintf('%s-%s.%s', $baseName, $timestamp, $extension);
-    }
-
-    /**
-     * Provide a consistent validation error response.
-     */
-    private function validationErrorResponse(array $errors, int $status = Response::HTTP_BAD_REQUEST): JsonResponse
-    {
-        return new JsonResponse([
-            'message' => 'Validation failed.',
-            'errors' => $errors,
-        ], $status);
-    }
-
-    /**
-     * Retrieve the configured filesystem disk for assets.
-     */
-    private function disk(): FilesystemAdapter
-    {
-        return Storage::disk(config('assetsme.disk', 'assets'));
-    }
-
-    /**
-     * Resolve folder ID from folder path string.
-     * Creates folders if they don't exist.
-     */
-    private function resolveFolderId(?string $folderPath, int $userId): ?int
-    {
-        if (!$folderPath || trim($folderPath) === '') {
-            return null;
-        }
-
-        $folderPath = trim($folderPath, '/');
-        if ($folderPath === '') {
-            return null;
-        }
-
-        // Split the path into parts
-        $pathParts = explode('/', $folderPath);
-        $currentParentId = null;
-        $currentFolder = null;
-
-        foreach ($pathParts as $folderName) {
-            if (trim($folderName) === '') {
-                continue;
-            }
-
-            // Look for existing folder
-            $existingFolder = Folder::where('name', $folderName)
-                ->where('parent_id', $currentParentId)
-                ->first();
-
-            if ($existingFolder) {
-                $currentFolder = $existingFolder;
-                $currentParentId = $existingFolder->id;
-            } else {
-                // Create new folder
-                $currentFolder = Folder::create([
-                    'name' => $folderName,
-                    'parent_id' => $currentParentId,
-                    'owner_id' => $userId,
-                    'access_level' => 'private',
-                ]);
-                $currentParentId = $currentFolder->id;
-            }
-        }
-
-        return $currentFolder?->id;
+        return $this->renameService->handle($request, $validated['path'], $validated['name']);
     }
 }
