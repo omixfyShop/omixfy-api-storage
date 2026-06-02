@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 
 export function InputToken() {
+    const { toast } = useToast();
     const [token, setToken] = useState<string>('');
 
-    // Carregar token do localStorage quando o componente monta
     useEffect(() => {
         const savedToken = localStorage.getItem('tokenAssetsme');
         if (savedToken) {
@@ -13,13 +14,18 @@ export function InputToken() {
         }
     }, []);
 
-    // Salvar token no localStorage quando muda
     const handleSaveToken = () => {
         if (token.trim()) {
             localStorage.setItem('tokenAssetsme', token.trim());
-            alert('Token salvo com sucesso!');
+            toast({
+                title: 'Token salvo com sucesso!',
+                variant: 'success',
+            });
         } else {
-            alert('Por favor, insira um token válido.');
+            toast({
+                title: 'Por favor, insira um token válido.',
+                variant: 'destructive',
+            });
         }
     };
 

@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { Loader2, RefreshCcw } from 'lucide-react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useAssets } from './use-assets';
 import { AssetsFilterForm } from './assets-filter-form';
 import { AssetsTable } from './assets-table';
@@ -24,6 +25,10 @@ export default function List() {
         fetchAssets,
         handleFilterSubmit,
         handleDelete,
+        assetToDelete,
+        isDeleting,
+        confirmDelete,
+        closeDeleteDialog,
         resetFilters,
         goToPreviousPage,
         goToNextPage,
@@ -79,6 +84,22 @@ export default function List() {
                     onDelete={handleDelete}
                     onPreviousPage={goToPreviousPage}
                     onNextPage={goToNextPage}
+                />
+
+                <ConfirmDialog
+                    open={assetToDelete !== null}
+                    onOpenChange={closeDeleteDialog}
+                    title="Remover arquivo"
+                    description={
+                        assetToDelete
+                            ? `Deseja remover "${assetToDelete.original_name}"? Esta ação não pode ser desfeita.`
+                            : undefined
+                    }
+                    confirmLabel="Remover"
+                    pendingLabel="Removendo…"
+                    destructive
+                    loading={isDeleting}
+                    onConfirm={confirmDelete}
                 />
             </div>
         </AppLayout>

@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/react';
 import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { breadcrumbs } from './constants';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CreateTokenDialog } from './create-token-dialog';
 import { PlainTokenDialog } from './plain-token-dialog';
 import { TokensTable } from './tokens-table';
@@ -25,6 +26,10 @@ export default function TokensIndex() {
         handleDelete,
         handleCopyToken,
         closeCreateDialog,
+        tokenToDelete,
+        isDeleting,
+        confirmDelete,
+        closeDeleteDialog,
     } = useTokenForm();
 
     return (
@@ -72,6 +77,18 @@ export default function TokensIndex() {
                     generatedToken={generatedToken}
                     copiedToken={copiedToken}
                     onCopy={handleCopyToken}
+                />
+
+                <ConfirmDialog
+                    open={tokenToDelete !== null}
+                    onOpenChange={closeDeleteDialog}
+                    title="Excluir token"
+                    description="Tem certeza que deseja excluir este token? Esta ação não pode ser desfeita."
+                    confirmLabel="Excluir"
+                    pendingLabel="Excluindo…"
+                    destructive
+                    loading={isDeleting}
+                    onConfirm={confirmDelete}
                 />
             </div>
         </AppLayout>

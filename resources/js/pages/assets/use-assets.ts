@@ -20,7 +20,11 @@ export interface UseAssetsReturn {
     canGoNext: boolean;
     fetchAssets: () => Promise<void>;
     handleFilterSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-    handleDelete: (asset: Asset) => Promise<void>;
+    handleDelete: (asset: Asset) => void;
+    assetToDelete: Asset | null;
+    isDeleting: boolean;
+    confirmDelete: () => Promise<void>;
+    closeDeleteDialog: (open: boolean) => void;
     resetFilters: () => void;
     goToPreviousPage: () => void;
     goToNextPage: () => void;
@@ -34,6 +38,8 @@ export function useAssets(): UseAssetsReturn {
     const [page, setPage] = useState<number>(1);
     const [appliedFolder, setAppliedFolder] = useState<string>('');
     const [meta, setMeta] = useState<PaginationMeta>(emptyMeta(1));
+    const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+    const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
     const TOKEN = localStorage.getItem('tokenAssetsme') ?? '';
     const hasToken = TOKEN !== '';
@@ -100,40 +106,50 @@ export function useAssets(): UseAssetsReturn {
         [folder],
     );
 
-    const handleDelete = useCallback(
-        async (asset: Asset) => {
-            if (!asset?.path) {
+    const handleDelete = useCallback((asset: Asset) => {
+        if (!asset?.path) {
+            return;
+        }
+
+        setAssetToDelete(asset);
+    }, []);
+
+    const closeDeleteDialog = useCallback((open: boolean) => {
+        if (!open) {
+            setAssetToDelete(null);
+        }
+    }, []);
+
+    const confirmDelete = useCallback(async () => {
+        if (!assetToDelete?.path) {
+            return;
+        }
+
+        const endpoint = buildEndpoint('/api/assets/file', { path: assetToDelete.path });
+
+        setIsDeleting(true);
+        try {
+            const response = await fetch(endpoint, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${TOKEN}` },
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                setError(extractErrorMessage(payload, 'Não foi possível remover o arquivo.'));
                 return;
             }
 
-            const confirmed = window.confirm(`Remover ${asset.original_name}?`);
-            if (!confirmed) {
-                return;
-            }
-
-            const endpoint = buildEndpoint('/api/assets/file', { path: asset.path });
-
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'DELETE',
-                    headers: { Authorization: `Bearer ${TOKEN}` },
-                });
-
-                const payload = await response.json().catch(() => ({}));
-
-                if (!response.ok) {
-                    setError(extractErrorMessage(payload, 'Não foi possível remover o arquivo.'));
-                    return;
-                }
-
-                setAssets((current) => current.filter((item) => item.path !== asset.path));
-            } catch (deleteError) {
-                console.error(deleteError);
-                setError('Erro de rede ao remover o arquivo.');
-            }
-        },
-        [TOKEN],
-    );
+            setAssets((current) => current.filter((item) => item.path !== assetToDelete.path));
+            setAssetToDelete(null);
+        } catch (deleteError) {
+            console.error(deleteError);
+            setError('Erro de rede ao remover o arquivo.');
+        } finally {
+            setIsDeleting(false);
+        }
+    }, [assetToDelete, TOKEN]);
 
     const resetFilters = useCallback(() => {
         setFolder('');
@@ -169,6 +185,10 @@ export function useAssets(): UseAssetsReturn {
         fetchAssets,
         handleFilterSubmit,
         handleDelete,
+        assetToDelete,
+        isDeleting,
+        confirmDelete,
+        closeDeleteDialog,
         resetFilters,
         goToPreviousPage,
         goToNextPage,

@@ -11,6 +11,8 @@ export function useTokenForm() {
     const [isPlainTokenOpen, setIsPlainTokenOpen] = useState(false);
     const [generatedToken, setGeneratedToken] = useState<string | null>(plainToken ?? null);
     const [copiedToken, copyToClipboard] = useClipboard();
+    const [tokenToDelete, setTokenToDelete] = useState<AccessTokenItem | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
         name: '',
@@ -39,15 +41,28 @@ export function useTokenForm() {
     }
 
     function handleDelete(token: AccessTokenItem): void {
-        const confirmed = window.confirm('Tem certeza que deseja excluir este token?');
+        setTokenToDelete(token);
+    }
 
-        if (!confirmed) {
+    function confirmDelete(): void {
+        if (!tokenToDelete) {
             return;
         }
 
-        router.delete(`/tokens/${token.id}`, {
+        setIsDeleting(true);
+        router.delete(`/tokens/${tokenToDelete.id}`, {
             preserveScroll: true,
+            onFinish: () => {
+                setIsDeleting(false);
+                setTokenToDelete(null);
+            },
         });
+    }
+
+    function closeDeleteDialog(open: boolean): void {
+        if (!open) {
+            setTokenToDelete(null);
+        }
     }
 
     async function handleCopyToken(): Promise<void> {
@@ -82,5 +97,9 @@ export function useTokenForm() {
         handleDelete,
         handleCopyToken,
         closeCreateDialog,
+        tokenToDelete,
+        isDeleting,
+        confirmDelete,
+        closeDeleteDialog,
     };
 }
