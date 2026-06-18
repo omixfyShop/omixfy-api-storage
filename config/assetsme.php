@@ -11,4 +11,7 @@ return [
     ],
     'max_width' => (int) env('ASSETS_MAX_WIDTH', 4000),
     'max_height' => (int) env('ASSETS_MAX_HEIGHT', 4000),
+    'variant_format' => env('ASSETS_VARIANT_FORMAT', 'webp'),
+    'variant_quality' => (int) env('IMAGE_QUALITY', 82),
+    'max_source_pixels' => (int) env('ASSETS_MAX_SOURCE_PIXELS', 24000000),
 ];
