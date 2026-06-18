@@ -1,11 +1,11 @@
 <?php
 
 use App\Jobs\GenerateFolderPreview;
+use App\Models\AccessToken;
 use App\Models\Folder;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 
-use function Pest\Laravel\actingAs;
 use function Pest\Laravel\deleteJson;
 use function Pest\Laravel\getJson;
 use function Pest\Laravel\postJson;
@@ -13,7 +13,8 @@ use function Pest\Laravel\postJson;
 beforeEach(function () {
     Queue::fake([GenerateFolderPreview::class]);
     $this->user = User::factory()->create();
-    actingAs($this->user, 'sanctum');
+    [, $plainToken] = AccessToken::createForUser($this->user, 'Tests');
+    test()->withToken($plainToken);
 });
 
 it('creates root and subfolders with breadcrumbs', function () {
