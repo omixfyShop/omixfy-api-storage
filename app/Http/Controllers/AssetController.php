@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Services\Asset\AssetDeleteService;
-use App\Services\Asset\AssetJpgService;
 use App\Services\Asset\AssetListService;
 use App\Services\Asset\AssetRenameService;
 use App\Services\Asset\AssetService;
@@ -22,7 +21,6 @@ class AssetController extends Controller
         private readonly AssetListService $listService,
         private readonly AssetDeleteService $deleteService,
         private readonly AssetRenameService $renameService,
-        private readonly AssetJpgService $jpgService,
     ) {
     }
 
@@ -316,33 +314,5 @@ class AssetController extends Controller
         $validated = $validator->validated();
 
         return $this->renameService->handle($request, $validated['path'], $validated['name']);
-    }
-
-    #[OA\Get(
-        path: "/api/assets/jpg",
-        summary: "Garante derivada JPEG de um asset",
-        description: "Mantém o asset original (ex.: WebP) e devolve a URL de uma versão JPEG cacheada, gerando-a na primeira chamada com fundo sólido para imagens com transparência. Útil para marketplaces que rejeitam WebP.",
-        tags: ["Assets"],
-        security: [["bearerAuth" => []]],
-        parameters: [
-            new OA\Parameter(
-                name: "path",
-                in: "query",
-                required: true,
-                description: "Caminho relativo do asset de origem",
-                schema: new OA\Schema(type: "string")
-            ),
-        ],
-        responses: [
-            new OA\Response(response: 200, description: "URL JPEG disponível"),
-            new OA\Response(response: 400, description: "Path inválido"),
-            new OA\Response(response: 401, description: "Não autorizado"),
-            new OA\Response(response: 404, description: "Asset não encontrado"),
-            new OA\Response(response: 500, description: "Falha ao converter para JPEG"),
-        ]
-    )]
-    public function ensureJpg(Request $request): JsonResponse
-    {
-        return $this->jpgService->handle($request);
     }
 }

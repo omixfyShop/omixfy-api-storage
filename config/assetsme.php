@@ -16,4 +16,9 @@ return [
     'max_source_pixels' => (int) env('ASSETS_MAX_SOURCE_PIXELS', 24000000),
     'jpg_quality' => (int) env('ASSETS_JPG_QUALITY', 90),
     'jpg_background' => env('ASSETS_JPG_BACKGROUND', '#ffffff'),
+    'ml_canvas_size' => (int) env('ASSETS_ML_CANVAS_SIZE', 1200),
+    'ml_fill_ratio' => (float) env('ASSETS_ML_FILL_RATIO', 0.92),
+    'ml_trim_tolerance' => (int) env('ASSETS_ML_TRIM_TOLERANCE', 18),
+    'ml_quality' => (int) env('ASSETS_ML_QUALITY', 90),
+    'ml_background' => env('ASSETS_ML_BACKGROUND', '#ffffff'),
 ];
