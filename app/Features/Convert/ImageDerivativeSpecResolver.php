@@ -96,8 +96,12 @@ final class ImageDerivativeSpecResolver
 
         $fill = (float) $value;
 
-        if ($fill <= 0.0 || $fill > 1.0) {
-            throw new InvalidArgumentException('The fill must be greater than 0 and at most 1.');
+        if ($fill <= 0.0) {
+            return $this->defaultFill;
+        }
+
+        if ($fill > 1.0) {
+            throw new InvalidArgumentException('The fill must be at most 1.');
         }
 
         return $fill;
