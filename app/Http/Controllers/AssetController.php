@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Features\Convert\JpgConverter;
 use App\Services\Asset\AssetDeleteService;
 use App\Services\Asset\AssetListService;
 use App\Services\Asset\AssetRenameService;
@@ -9,6 +10,7 @@ use App\Services\Asset\AssetService;
 use App\Services\Asset\AssetUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\Response;
@@ -314,5 +316,73 @@ class AssetController extends Controller
         $validated = $validator->validated();
 
         return $this->renameService->handle($request, $validated['path'], $validated['name']);
+    }
+
+    #[OA\Get(
+        path: "/api/assets/jpg",
+        summary: "Garante derivada JPEG de um asset",
+        description: "Mantém o asset original (ex.: WebP) e devolve a URL de uma versão JPEG cacheada, gerando-a na primeira chamada com fundo sólido para imagens com transparência. Útil para marketplaces que rejeitam WebP.",
+        tags: ["Assets"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(
+                name: "path",
+                in: "query",
+                required: true,
+                description: "Caminho relativo do asset de origem",
+                schema: new OA\Schema(type: "string")
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "URL JPEG disponível"),
+            new OA\Response(response: 400, description: "Path inválido"),
+            new OA\Response(response: 401, description: "Não autorizado"),
+            new OA\Response(response: 404, description: "Asset não encontrado"),
+            new OA\Response(response: 500, description: "Falha ao converter para JPEG"),
+        ]
+    )]
+    public function ensureJpg(Request $request): JsonResponse
+    {
+        $path = $this->assetService->normalizePath((string) $request->query('path', ''));
+
+        if ($path === null) {
+            return $this->assetService->validationErrorResponse([
+                'path' => ['A valid asset path is required.'],
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $disk = $this->assetService->disk();
+
+        if (! $disk->exists($path)) {
+            return new JsonResponse(['message' => 'Source asset not found.'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $resultPath = (new JpgConverter($disk))->ensure($path);
+        } catch (\Throwable $exception) {
+            Log::error('Falha ao gerar derivada JPEG', [
+                'path' => $path,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return new JsonResponse(['message' => 'Failed to convert image to JPEG.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $converted = $resultPath !== $path;
+
+        Log::info('Derivada JPEG resolvida', [
+            'source_path' => $path,
+            'result_path' => $resultPath,
+            'converted' => $converted,
+        ]);
+
+        return new JsonResponse([
+            'data' => [
+                'source_path' => $path,
+                'path' => $resultPath,
+                'url' => $disk->url($resultPath),
+                'converted' => $converted,
+            ],
+        ], Response::HTTP_OK);
     }
 }

@@ -2,8 +2,13 @@ FROM php:8.3-cli
 
 RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    libwebp-dev \
     unzip \
-    && docker-php-ext-install pdo_sqlite \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j"$(nproc)" pdo_sqlite gd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

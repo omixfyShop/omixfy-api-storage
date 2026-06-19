@@ -14,4 +14,6 @@ return [
     'variant_format' => env('ASSETS_VARIANT_FORMAT', 'webp'),
     'variant_quality' => (int) env('IMAGE_QUALITY', 82),
     'max_source_pixels' => (int) env('ASSETS_MAX_SOURCE_PIXELS', 24000000),
+    'jpg_quality' => (int) env('ASSETS_JPG_QUALITY', 90),
+    'jpg_background' => env('ASSETS_JPG_BACKGROUND', '#ffffff'),
 ];

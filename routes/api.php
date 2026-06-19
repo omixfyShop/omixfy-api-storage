@@ -11,6 +11,7 @@ Route::get('/health', [AssetController::class, 'health']);
 
 Route::middleware('token')->group(function () {
     Route::post('/assets/upload', [AssetController::class, 'upload']);
+    Route::get('/assets/jpg', [AssetController::class, 'ensureJpg']);
     Route::get('/assets/list', [AssetController::class, 'list']);
     Route::delete('/assets/file', [AssetController::class, 'delete']);
     Route::patch('/assets/rename', [AssetController::class, 'rename']);
