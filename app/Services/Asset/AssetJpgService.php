@@ -2,66 +2,46 @@
 
 namespace App\Services\Asset;
 
+use App\Features\Convert\CachedImageDerivative;
 use App\Features\Convert\JpgConverter;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\HttpFoundation\Response;
 
-class AssetJpgService
+class AssetJpgService extends AssetDerivativeService
 {
-    public function __construct(
-        private readonly AssetService $assetService,
-    ) {
+    protected function converter(FilesystemAdapter $disk): CachedImageDerivative
+    {
+        return new JpgConverter($disk);
     }
 
-    public function handle(Request $request): JsonResponse
+    protected function failureMessage(): string
     {
-        $path = $this->assetService->normalizePath((string) $request->query('path', ''));
+        return 'Failed to convert image to JPEG.';
+    }
 
-        if ($path === null) {
-            return $this->assetService->validationErrorResponse([
-                'path' => ['A valid asset path is required.'],
-            ], Response::HTTP_BAD_REQUEST);
-        }
+    protected function logFailure(string $path, string $error): void
+    {
+        Log::error('Falha ao gerar derivada JPEG', [
+            'path' => $path,
+            'error' => $error,
+        ]);
+    }
 
-        $disk = $this->assetService->disk();
-
-        if (! $disk->exists($path)) {
-            return new JsonResponse(['message' => 'Source asset not found.'], Response::HTTP_NOT_FOUND);
-        }
-
-        try {
-            $resultPath = (new JpgConverter($disk))->ensure($path);
-        } catch (\Throwable $exception) {
-            Log::error('Falha ao gerar derivada JPEG', [
-                'path' => $path,
-                'error' => $exception->getMessage(),
-            ]);
-
-            return new JsonResponse(['message' => 'Failed to convert image to JPEG.'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $converted = $resultPath !== $path;
+    protected function successPayload(string $sourcePath, string $resultPath): array
+    {
+        $converted = $resultPath !== $sourcePath;
 
         Log::info('Derivada JPEG resolvida', [
-            'source_path' => $path,
+            'source_path' => $sourcePath,
             'result_path' => $resultPath,
             'converted' => $converted,
         ]);
 
-        return new JsonResponse([
-            'data' => [
-                'source_path' => $path,
-                'path' => $resultPath,
-                'url' => $this->normalizeUrl($disk->url($resultPath)),
-                'converted' => $converted,
-            ],
-        ], Response::HTTP_OK);
-    }
-
-    private function normalizeUrl(string $url): string
-    {
-        return preg_replace('#(?<!:)//+#', '/', $url) ?? $url;
+        return [
+            'source_path' => $sourcePath,
+            'path' => $resultPath,
+            'url' => $this->assetService->publicUrl($resultPath),
+            'converted' => $converted,
+        ];
     }
 }

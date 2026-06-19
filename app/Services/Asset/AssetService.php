@@ -18,6 +18,13 @@ class AssetService
         return Storage::disk(config('assetsme.disk', 'assets'));
     }
 
+    public function publicUrl(string $path): string
+    {
+        $url = $this->disk()->url($path);
+
+        return preg_replace('#(?<!:)//+#', '/', $url) ?? $url;
+    }
+
     public function getUserId(Request $request): ?int
     {
         return $request->user()?->id ?? $request->attributes->get('token_user_id');
