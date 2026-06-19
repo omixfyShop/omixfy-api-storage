@@ -2,7 +2,10 @@
 
 namespace App\Services\Asset;
 
-use App\Features\Convert\ImageResize;
+use App\Features\Convert\VariantKey;
+use App\Features\Convert\VariantSize;
+use App\Features\Convert\VariantSizeResolver;
+use App\Jobs\GenerateAssetVariants;
 use App\Models\Asset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,16 +40,19 @@ class AssetUploadService
         }
 
         $disk = $this->assetService->disk();
-        $imageResize = new ImageResize($disk);
 
-        $variantDefinitions = [];
+        $resolver = new VariantSizeResolver();
+        $variants = [];
         $variantErrors = [];
 
-        foreach (['small', 'medium', 'large'] as $variantKey) {
+        foreach (VariantKey::cases() as $variantKey) {
             try {
-                $variantDefinitions[$variantKey] = $imageResize->resolveVariantSize($request->query($variantKey), $variantKey);
+                $size = $resolver->resolve($request->query($variantKey->value), $variantKey);
+                if ($size !== null) {
+                    $variants[$variantKey->value] = $size;
+                }
             } catch (InvalidArgumentException $exception) {
-                $variantErrors[$variantKey] = [$exception->getMessage()];
+                $variantErrors[$variantKey->value] = [$exception->getMessage()];
             }
         }
 
@@ -65,7 +71,7 @@ class AssetUploadService
             }
 
             $detectedMime = $finfo->file($file->getRealPath());
-            $result = $this->processFile($file, $detectedMime, $folder, $folderId, $userId, $disk, $imageResize, $variantDefinitions);
+            $result = $this->processFile($file, $detectedMime, $folder, $folderId, $userId, $disk, $variants);
 
             if ($result instanceof JsonResponse) {
                 return $result;
@@ -126,6 +132,9 @@ class AssetUploadService
         return null;
     }
 
+    /**
+     * @param  array<string, VariantSize>  $variants
+     */
     private function processFile(
         UploadedFile $file,
         string $detectedMime,
@@ -133,8 +142,7 @@ class AssetUploadService
         ?int $folderId,
         int $userId,
         \Illuminate\Filesystem\FilesystemAdapter $disk,
-        ImageResize $imageResize,
-        array $variantDefinitions,
+        array $variants,
     ): array|JsonResponse {
         $fileName = $this->assetService->buildFileName($file, $detectedMime);
         $relativePath = ltrim(($folder ? $folder . '/' : '') . $fileName, '/');
@@ -165,22 +173,8 @@ class AssetUploadService
             'uploaded_by' => $userId,
         ]);
 
-        $sizes = [];
-        $variantMetadata = [];
-
-        try {
-            $variantResult = $imageResize->generateVariantData($relativePath, $folder, $fileName, $variantDefinitions);
-            $sizes = $variantResult['urls'];
-            $variantMetadata = $variantResult['metadata'];
-        } catch (\Throwable $exception) {
-            return new JsonResponse([
-                'message' => 'Failed to generate one or more image variants.',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        if ($variantMetadata !== []) {
-            $asset->generated_thumbs = $variantMetadata;
-            $asset->save();
+        if ($variants !== []) {
+            GenerateAssetVariants::dispatch($asset->id, $variants);
         }
 
         $result = [
@@ -196,12 +190,8 @@ class AssetUploadService
             'created_at' => $asset->created_at,
         ];
 
-        if ($sizes !== []) {
-            $result['sizes'] = $sizes;
-        }
-
-        if ($variantMetadata !== []) {
-            $result['generated_thumbs'] = $variantMetadata;
+        if ($variants !== []) {
+            $result['variants_status'] = 'processing';
         }
 
         return $result;

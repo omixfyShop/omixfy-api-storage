@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
+use App\Features\Convert\ImageResize;
 use App\Models\Asset;
 use App\Models\Folder;
-use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\Storage;
 class FolderPreviewService
 {
     public function __construct(
-        private readonly ?Filesystem $disk = null,
+        private readonly ?FilesystemAdapter $disk = null,
     ) {
     }
 
@@ -89,7 +90,8 @@ class FolderPreviewService
         $thumbFilename = pathinfo($sourcePath, PATHINFO_FILENAME)."_{$size}.webp";
         $thumbPath = trim($thumbDirectory.'/'.$thumbFilename, '/');
 
-        $disk->put($thumbPath, $disk->get($sourcePath));
+        $imageResize = new ImageResize($disk);
+        $imageResize->makeThumbnail($sourcePath, $thumbPath, $size, $size, $quality);
 
         return $thumbPath;
     }
