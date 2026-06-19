@@ -2,29 +2,21 @@
 
 namespace App\Services\Asset;
 
-use App\Features\Convert\CachedImageDerivative;
-use Illuminate\Filesystem\FilesystemAdapter;
+use App\Features\Convert\ImageDerivative;
+use App\Features\Convert\ImageDerivativeSpecResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
 
-abstract class AssetDerivativeService
+class AssetDerivativeService
 {
     public function __construct(
-        protected readonly AssetService $assetService,
+        private readonly AssetService $assetService,
+        private readonly ImageDerivativeSpecResolver $specResolver,
     ) {
     }
-
-    abstract protected function converter(FilesystemAdapter $disk): CachedImageDerivative;
-
-    abstract protected function failureMessage(): string;
-
-    abstract protected function logFailure(string $path, string $error): void;
-
-    /**
-     * @return array<string, mixed>
-     */
-    abstract protected function successPayload(string $sourcePath, string $resultPath): array;
 
     public function handle(Request $request): JsonResponse
     {
@@ -36,6 +28,20 @@ abstract class AssetDerivativeService
             ], Response::HTTP_BAD_REQUEST);
         }
 
+        try {
+            $spec = $this->specResolver->resolve([
+                'format' => $request->query('format'),
+                'size' => $request->query('size'),
+                'fill' => $request->query('fill'),
+                'bg' => $request->query('bg'),
+                'square' => $request->query('square'),
+            ]);
+        } catch (InvalidArgumentException $exception) {
+            return $this->assetService->validationErrorResponse([
+                'derivative' => [$exception->getMessage()],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $disk = $this->assetService->disk();
 
         if (! $disk->exists($path)) {
@@ -43,15 +49,27 @@ abstract class AssetDerivativeService
         }
 
         try {
-            $resultPath = $this->converter($disk)->ensure($path);
+            $resultPath = (new ImageDerivative($disk, $spec))->ensure($path);
         } catch (\Throwable $exception) {
-            $this->logFailure($path, $exception->getMessage());
+            Log::error('Falha ao gerar derivada de imagem', [
+                'path' => $path,
+                'error' => $exception->getMessage(),
+            ]);
 
-            return new JsonResponse(['message' => $this->failureMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse(['message' => 'Failed to build image derivative.'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
+        Log::info('Derivada de imagem resolvida', [
+            'source_path' => $path,
+            'result_path' => $resultPath,
+        ]);
+
         return new JsonResponse([
-            'data' => $this->successPayload($path, $resultPath),
+            'data' => [
+                'source_path' => $path,
+                'path' => $resultPath,
+                'url' => $this->assetService->publicUrl($resultPath),
+            ],
         ], Response::HTTP_OK);
     }
 }

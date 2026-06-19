@@ -16,6 +16,8 @@ abstract class CachedImageDerivative
 
     abstract protected function derivedSuffix(): string;
 
+    abstract protected function outputFormat(): string;
+
     abstract protected function encodeQuality(): int;
 
     abstract protected function transform(InterventionImage $image): InterventionImage;
@@ -27,7 +29,7 @@ abstract class CachedImageDerivative
     {
         $directory = trim((string) pathinfo($sourcePath, PATHINFO_DIRNAME), '.');
         $name = pathinfo($sourcePath, PATHINFO_FILENAME);
-        $derivedName = sprintf('%s--%s.jpg', $name, $this->derivedSuffix());
+        $derivedName = sprintf('%s--%s.%s', $name, $this->derivedSuffix(), $this->outputFormat());
 
         $prefix = ($directory !== '' && $directory !== '/') ? $directory.'/' : '';
 
@@ -73,7 +75,7 @@ abstract class CachedImageDerivative
             $result = $this->transform($image);
 
             try {
-                return (string) $result->encode('jpg', $this->encodeQuality());
+                return (string) $result->encode($this->outputFormat(), $this->encodeQuality());
             } finally {
                 if ($result !== $image) {
                     $result->destroy();
