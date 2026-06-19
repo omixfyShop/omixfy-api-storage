@@ -5,15 +5,14 @@ use App\Http\Controllers\Api\V1\FolderController;
 use App\Http\Controllers\Api\V1\FolderMoveController;
 use App\Http\Controllers\Api\V1\FolderTokenController;
 use App\Http\Controllers\AssetController;
-use App\Http\Controllers\AssetImageDerivativeController;
+use App\Http\Controllers\AssetDerivativeController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [AssetController::class, 'health']);
 
 Route::middleware('token')->group(function () {
     Route::post('/assets/upload', [AssetController::class, 'upload']);
-    Route::get('/assets/jpg', [AssetImageDerivativeController::class, 'ensureJpg']);
-    Route::get('/assets/ml-ready', [AssetImageDerivativeController::class, 'ensureMlReady']);
+    Route::get('/assets/derivative', [AssetDerivativeController::class, 'derivative']);
     Route::get('/assets/list', [AssetController::class, 'list']);
     Route::delete('/assets/file', [AssetController::class, 'delete']);
     Route::patch('/assets/rename', [AssetController::class, 'rename']);

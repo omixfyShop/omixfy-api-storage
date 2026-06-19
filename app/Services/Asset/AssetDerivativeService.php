@@ -2,16 +2,19 @@
 
 namespace App\Services\Asset;
 
-use App\Features\Convert\JpgConverter;
+use App\Features\Convert\ImageDerivative;
+use App\Features\Convert\ImageDerivativeSpecResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
 
-class AssetJpgService
+class AssetDerivativeService
 {
     public function __construct(
         private readonly AssetService $assetService,
+        private readonly ImageDerivativeSpecResolver $specResolver,
     ) {
     }
 
@@ -25,6 +28,20 @@ class AssetJpgService
             ], Response::HTTP_BAD_REQUEST);
         }
 
+        try {
+            $spec = $this->specResolver->resolve([
+                'format' => $request->query('format'),
+                'size' => $request->query('size'),
+                'fill' => $request->query('fill'),
+                'bg' => $request->query('bg'),
+                'square' => $request->query('square'),
+            ]);
+        } catch (InvalidArgumentException $exception) {
+            return $this->assetService->validationErrorResponse([
+                'derivative' => [$exception->getMessage()],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $disk = $this->assetService->disk();
 
         if (! $disk->exists($path)) {
@@ -32,36 +49,27 @@ class AssetJpgService
         }
 
         try {
-            $resultPath = (new JpgConverter($disk))->ensure($path);
+            $resultPath = (new ImageDerivative($disk, $spec))->ensure($path);
         } catch (\Throwable $exception) {
-            Log::error('Falha ao gerar derivada JPEG', [
+            Log::error('Falha ao gerar derivada de imagem', [
                 'path' => $path,
                 'error' => $exception->getMessage(),
             ]);
 
-            return new JsonResponse(['message' => 'Failed to convert image to JPEG.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse(['message' => 'Failed to build image derivative.'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        $converted = $resultPath !== $path;
-
-        Log::info('Derivada JPEG resolvida', [
+        Log::info('Derivada de imagem resolvida', [
             'source_path' => $path,
             'result_path' => $resultPath,
-            'converted' => $converted,
         ]);
 
         return new JsonResponse([
             'data' => [
                 'source_path' => $path,
                 'path' => $resultPath,
-                'url' => $this->normalizeUrl($disk->url($resultPath)),
-                'converted' => $converted,
+                'url' => $this->assetService->publicUrl($resultPath),
             ],
         ], Response::HTTP_OK);
-    }
-
-    private function normalizeUrl(string $url): string
-    {
-        return preg_replace('#(?<!:)//+#', '/', $url) ?? $url;
     }
 }
