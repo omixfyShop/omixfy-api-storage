@@ -41,20 +41,7 @@ class AssetUploadService
 
         $disk = $this->assetService->disk();
 
-        $resolver = new VariantSizeResolver();
-        $variants = [];
-        $variantErrors = [];
-
-        foreach (VariantKey::cases() as $variantKey) {
-            try {
-                $size = $resolver->resolve($request->query($variantKey->value), $variantKey);
-                if ($size !== null) {
-                    $variants[$variantKey->value] = $size;
-                }
-            } catch (InvalidArgumentException $exception) {
-                $variantErrors[$variantKey->value] = [$exception->getMessage()];
-            }
-        }
+        [$variants, $variantErrors] = $this->resolveVariants($request);
 
         if ($variantErrors !== []) {
             return $this->assetService->validationErrorResponse($variantErrors, Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -81,6 +68,29 @@ class AssetUploadService
         }
 
         return new JsonResponse(['data' => $results], Response::HTTP_CREATED);
+    }
+
+    /**
+     * @return array{0: array<string, VariantSize>, 1: array<string, array<int, string>>}
+     */
+    private function resolveVariants(Request $request): array
+    {
+        $resolver = new VariantSizeResolver();
+        $variants = [];
+        $variantErrors = [];
+
+        foreach (VariantKey::cases() as $variantKey) {
+            try {
+                $size = $resolver->resolve($request->query($variantKey->value), $variantKey);
+                if ($size !== null) {
+                    $variants[$variantKey->value] = $size;
+                }
+            } catch (InvalidArgumentException $exception) {
+                $variantErrors[$variantKey->value] = [$exception->getMessage()];
+            }
+        }
+
+        return [$variants, $variantErrors];
     }
 
     /**
