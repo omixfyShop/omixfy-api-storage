@@ -54,9 +54,14 @@ class AssetJpgService
             'data' => [
                 'source_path' => $path,
                 'path' => $resultPath,
-                'url' => $disk->url($resultPath),
+                'url' => $this->normalizeUrl($disk->url($resultPath)),
                 'converted' => $converted,
             ],
         ], Response::HTTP_OK);
+    }
+
+    private function normalizeUrl(string $url): string
+    {
+        return preg_replace('#(?<!:)//+#', '/', $url) ?? $url;
     }
 }
